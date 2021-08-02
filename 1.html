@@ -47,27 +47,258 @@ Notes go here and will be in the source but not displayed
 # goals
 
 1. what you build on top of matters
-1. selectors
-1. view source code of blog.cloudflare.com
-1. power of selector targeting
+1. css selectors
+1. source code of blog.cloudflare.com
 1. old style input labels
-1. css-only menu
+1. css-only hamburger menu
 
 ---
 
 # what you build on top of matters
 
-- appropriate complexity can drive re-use or re-invention
-- multiple levels of abstraction can bring competing conventions and become a mess to enhance
-- when 
-      
-      <input id="moo" type="checkbox" /><label for="moo">Shoe</label>      
+- appropriate complexity can drive either re-use or re-invention
+- [layers of abstraction](https://wiki.c2.com/?PrematureGeneralization) may introduce competing conventions and make custom enhancements more difficult
+- every dependency may come along with its own branching set of dependencies and assumptions
+- todays cool thing is tomorrows outcast, meet: [jQuery](https://mmikowski.github.io/why-jquery/) (this will also happen to Node.js and React and ...)
+- frameworks may lead you to avoid native functionality
       
 ???
 
+Re-using existing working code is building on the work of what came before us
+Should a site that does not do any dynamic interaction require Javascript?
+Does using the latest frameworks keep us current or make our work more brittle?
+
 ---
-      
-      
+
+# css selectors
+
+
+```css
+nav.example li {
+  background-color: lightgrey;
+}
+
+nav.example li:last-child {
+  list-style-type: "→";
+  font-style: italic
+}
+```
+
+```html
+<nav class="example">
+  <ul>
+    <li><a href="/1.html">restart</a></li>
+    <li><a href="https://developer.mozilla.org/en-US/">learn</a></li>
+    <li><a href="https://zombo.com">zombo.com</a></li>
+  </ul>
+</nav>
+```
+
+<style>
+nav.example li a {
+  color: darkgrey;
+}
+nav.example li:last-child {
+  list-style-type: "→";
+  font-style: italic
+}
+</style>
+
+<hr />
+<nav class="example">
+  <ul>
+    <li><a href="/1.html">restart</a></li>
+    <li><a href="https://developer.mozilla.org/en-US/">learn</a></li>
+    <li><a href="https://zombo.com">zombo.com</a></li>
+  </ul>
+</nav>
+
+???
+
+Prefer semantic elements like nav, aside, header over div
+When CSS is written to match the HTML it should target and HTML is written to be targetted pages can contain far less code
+The 'cascading' in the name CSS is really about appropriate style reuse because of the hierarchy of elements and styles
+
+---
+
+# source code of [blog.cloudflare.com](https://blog.cloudflare.com)
+
+- readablility (syntax highlighting only gets you so far)
+- repetition of css classes without selection targetting
+- does this represent us as well as the blog content does?
+
+---
+
+# good ol' input labels
+
+- capture some state
+- can be targetted with css
+
+```css
+#shoe:checked + label {
+  font-style: italic;
+}
+
+#shoe:checked + label + small {
+  display: none;
+}
+```
+
+```html
+<input id="shoe" type="checkbox"><label for="shoe">Shoe</label>
+<small>&#128095;</small>
+```
+
+<style>
+#shoe:checked + label {
+  font-style: italic;
+}
+#shoe:checked + label + small {
+  display: none;
+}
+</style>
+
+<hr />
+<input id="shoe" type="checkbox" /><label for="shoe">Shoe</label>
+<small>&#128095;</small>
+
+???
+
+During the IE2 era not all browser versions correctly supported label clicking to modify the state of the checkbox
+Note the use of the adjacent sibling combinator +
+And importantly the dynamism that targeting offers us - including visibility
+
+---
+
+# css-only hamburger menu &nbsp; <svg viewBox="0 0 100 80" width="2.4rem" height="2.4rem"><rect y="10" width="80" height="5"></rect><rect y="30" width="80" height="5"></rect><rect y="50" width="80" height="5"></rect> </svg>
+
+
+```css
+.burger-shower {
+    display: none;
+}
+    
+.burger-shower:checked ~ .burger-menu {
+    display: block;
+}
+        
+.burger-menu {
+    display: none;
+    position: absolute;
+}
+
+```
+
+```html
+<nav id="hamburger_navigation">
+  <input type="checkbox" id="burger-shower" class="burger-shower">
+  <label for="burger-shower" class="hamburger">&#127828;</label>
+
+  <ul class="burger-menu">
+    <li><a href="/approach/">Approach</a></li>
+    <li><a href="/people/">People</a></li>
+    <li><a href="/projects/">Projects</a></li>
+  </ul>
+</nav>
+```
+
+???
+
+This is literally the code running on the following page to make the menu work
+Notice the general sibling combinator ~
+Note the use of display none to remove the element from consideration by layout engine
+Absolute position pulls the element out of the static ordering and placement and attaches it to the parent location
+
+---
+
+<style>
+.burger-shower { display: none; }
+    
+.burger-shower:checked ~ .burger-menu {
+    display: block;
+}
+        
+.burger-menu {
+    display: none;
+    position: absolute;
+}
+</style>
+
+<nav id="hamburger_navigation">
+  <input type="checkbox" id="burger-shower" class="burger-shower">
+  <label for="burger-shower" class="hamburger">&#127828;</label>
+
+  <ul class="burger-menu">
+    <li><a href="/approach/">Approach</a></li>
+    <li><a href="/people/">People</a></li>
+    <li><a href="/projects/">Projects</a></li>
+  </ul>
+</nav>
+
+???
+---
+
+<style>
+#navigation {
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+  display: inline;
+  padding: 1rem;
+  border-bottom: 2px solid #f0f0f0;
+}
+#navigation .burger-shower { 
+  display: none; 
+}
+    
+#navigation .burger-shower:checked ~ .burger-menu {
+  display: block;
+}
+#navigation .burger-menu {
+  display: none;
+  position: absolute;
+  top: 4rem;
+}
+#navigation ul.burger-menu {
+  background-color: white;
+  margin: 0;
+  padding: 1rem;
+}
+
+#navigation ul.burger-menu li {
+  display: block; 
+  margin: 0 0 1rem 0;
+}
+#navigation ul.burger-menu li a {
+  color: darkgrey;
+  text-decoration: none;
+}
+#navigation ul.burger-menu li a:hover {
+  color: black;
+  text-decoration: none;
+}
+
+</style>
+
+<nav id="navigation">
+  <input type="checkbox" id="shower" class="burger-shower">
+  <label for="shower" class="hamburger">
+    <svg viewBox="0 0 100 80" width="2.4rem" height="1rem">
+      <rect y="10" width="80" height="5"></rect>
+      <rect y="30" width="80" height="5"></rect>
+      <rect y="50" width="80" height="5"></rect>
+    </svg>  
+  </label>
+
+  <ul class="burger-menu">
+    <li><a href="/approach/">Approach</a></li>
+    <li><a href="/people/">People</a></li>
+    <li><a href="/projects/">Projects</a></li>
+  </ul>
+  
+  Cloudflare Research
+
+</nav>
+
+     
     </textarea>
     <script src="https://remarkjs.com/downloads/remark-latest.min.js" type="text/javascript">
     </script>
