@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>dimlight 1: css selectors and css-only menus</title>
+    <title>dimlight 1: CSS selectors and CSS-only menus</title>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <style type="text/css">
       @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
@@ -35,7 +35,7 @@
 
 class: center, middle, front
 
-# dimlight 1: css selectors and css-only menus
+# dimlight 1: CSS selectors and CSS-only menus
 
 #### "Low Light" by blavandmaster is licensed under CC BY-NC-SA 2.0
        
@@ -47,10 +47,10 @@ Notes go here and will be in the source but not displayed
 # goals
 
 1. what you build on top of matters
-1. css selectors
+1. Cascading Style Sheets (CSS) selectors
 1. source code of blog.cloudflare.com
 1. old style input labels
-1. css-only hamburger menu
+1. CSS-only hamburger menu
 
 ---
 
@@ -70,7 +70,83 @@ Does using the latest frameworks keep us current or make our work more brittle?
 
 ---
 
-# css selectors
+# [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors) 
+
+Select nuts and bolts of how CSS targets some pretend HTML elements:
+
+```html
+<par>
+  <elem class="css-class" id="element-identifier">One</elem>
+  <elem>Two</elem>
+</par>
+<elem class="css-class">Three</elem>
+Four
+```
+
+The applicability "cascade" in "Cascading Style Sheets":
+
+```css
+                /* increasingly more specific CSS selectors */
+
+* { color: purple }                         /* most general                 */
+
+elem { color: red }                         /* more specific - all elem's    */
+
+par elem { color: yellow }                  /* all elem's within a par        */
+
+elem.css-class { color: orange }            /* all elem's with class css-class */
+
+elem#element-identifier { color: brown }    /* only id element-identifier       */
+```
+
+---
+
+
+# [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors) 
+
+Select nuts and bolts of how CSS targets some pretend HTML elements:
+
+```html
+<par>
+  <elem class="css-class" id="element-identifier">One</elem>
+  <elem>Two</elem>
+</par>
+<elem class="css-class">Three</elem>
+Four
+```
+
+<style>
+.all { color: purple; font-weight: 900 }
+elem { color: red }
+par elem { color: yellow }
+elem.css-class { color: orange }
+elem#element-identifier { color: brown } 
+</style>
+
+The applicability "cascade" in "Cascading Style Sheets":  <par>
+  <elem class="css-class" id="element-identifier">One</elem>
+    <elem>Two</elem>
+    </par>
+    <elem class="css-class">Three</elem>
+    <span class="all">Four</span>
+
+```css
+                /* increasingly more specific CSS selectors */
+
+* { color: purple }                         /* most general                 */
+
+elem { color: red }                         /* more specific - all elem's    */
+
+par elem { color: yellow }                  /* all elem's within a par        */
+
+elem.css-class { color: orange }            /* all elem's with class css-class */
+
+elem#element-identifier { color: brown }    /* only id element-identifier       */
+```
+
+---
+
+## [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors) example
 
 
 ```css
@@ -124,7 +200,7 @@ The 'cascading' in the name CSS is really about appropriate style reuse because 
 # source code of [blog.cloudflare.com](https://blog.cloudflare.com)
 
 - readablility (syntax highlighting only gets you so far)
-- repetition of css classes without selection targetting
+- repetition of CSS classes without selection targetting
 - does this represent us as well as the blog content does?
 
 ---
@@ -132,7 +208,7 @@ The 'cascading' in the name CSS is really about appropriate style reuse because 
 # good ol' input labels
 
 - capture some state
-- can be targetted with css
+- can be targetted with CSS
 
 ```css
 #shoe:checked + label {
@@ -145,7 +221,8 @@ The 'cascading' in the name CSS is really about appropriate style reuse because 
 ```
 
 ```html
-<input id="shoe" type="checkbox"><label for="shoe">Shoe</label>
+<input id="shoe" type="checkbox">
+<label for="shoe">Shoe</label>
 <small>&#128095;</small>
 ```
 
@@ -170,7 +247,7 @@ And importantly the dynamism that targeting offers us - including visibility
 
 ---
 
-# css-only hamburger menu &nbsp; <svg viewBox="0 0 100 80" width="2.4rem" height="2.4rem"><rect y="10" width="80" height="5"></rect><rect y="30" width="80" height="5"></rect><rect y="50" width="80" height="5"></rect> </svg>
+# CSS-only hamburger menu &nbsp; <svg viewBox="0 0 100 80" width="2.4rem" height="2.4rem"><rect y="10" width="80" height="5"></rect><rect y="30" width="80" height="5"></rect><rect y="50" width="80" height="5"></rect> </svg>
 
 
 ```css
