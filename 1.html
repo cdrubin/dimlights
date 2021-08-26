@@ -149,6 +149,16 @@ elem#element-identifier { color: brown }    /* only id element-identifier       
 ## [CSS selectors](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors) example
 
 
+```html
+<nav class="example">
+  <ul>
+    <li><a href="/1.html">restart</a></li>
+    <li><a href="https://developer.mozilla.org/en-US/">learn</a></li>
+    <li><a href="https://zombo.com">zombo.com</a></li>
+  </ul>
+</nav>
+```
+
 ```css
 nav.example li {
   background-color: lightgrey;
@@ -158,16 +168,6 @@ nav.example li:last-child {
   list-style-type: "→";
   font-style: italic
 }
-```
-
-```html
-<nav class="example">
-  <ul>
-    <li><a href="/1.html">restart</a></li>
-    <li><a href="https://developer.mozilla.org/en-US/">learn</a></li>
-    <li><a href="https://zombo.com">zombo.com</a></li>
-  </ul>
-</nav>
 ```
 
 <style>
@@ -211,6 +211,12 @@ The 'cascading' in the name CSS is really about appropriate style reuse because 
 - capture some state
 - can be targetted with CSS
 
+```html
+<input id="shoe" type="checkbox">
+<label for="shoe">Shoe</label>
+<small>&#128095;</small>
+```
+
 ```css
 #shoe:checked + label {
   font-style: italic;
@@ -219,12 +225,6 @@ The 'cascading' in the name CSS is really about appropriate style reuse because 
 #shoe:checked + label + small {
   display: none;
 }
-```
-
-```html
-<input id="shoe" type="checkbox">
-<label for="shoe">Shoe</label>
-<small>&#128095;</small>
 ```
 
 <style>
@@ -251,6 +251,19 @@ And importantly the dynamism that targeting offers us - including visibility
 # CSS-only hamburger menu &nbsp; <svg viewBox="0 0 100 80" width="2.4rem" height="2.4rem"><rect y="10" width="80" height="5"></rect><rect y="30" width="80" height="5"></rect><rect y="50" width="80" height="5"></rect> </svg>
 
 
+```html
+<nav id="hamburger_navigation">
+  <input type="checkbox" id="burger-shower" class="burger-shower">
+  <label for="burger-shower" class="hamburger">&#127828;</label>
+
+  <ul class="burger-menu">
+    <li><a href="/approach/">Approach</a></li>
+    <li><a href="/people/">People</a></li>
+    <li><a href="/projects/">Projects</a></li>
+  </ul>
+</nav>
+```
+
 ```css
 .burger-shower {
     display: none;
@@ -265,19 +278,6 @@ And importantly the dynamism that targeting offers us - including visibility
     position: absolute;
 }
 
-```
-
-```html
-<nav id="hamburger_navigation">
-  <input type="checkbox" id="burger-shower" class="burger-shower">
-  <label for="burger-shower" class="hamburger">&#127828;</label>
-
-  <ul class="burger-menu">
-    <li><a href="/approach/">Approach</a></li>
-    <li><a href="/people/">People</a></li>
-    <li><a href="/projects/">Projects</a></li>
-  </ul>
-</nav>
 ```
 
 ???
