@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>dimlight #2: <b><i>passcake</i></b> - browser-based encrypted credentials/notes</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body, li { font-family: 'Droid Serif'; }
+      li {
+      	font-size: larger;
+      	padding-bottom: 1rem;
+      }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      h4 {
+        text-align: right;
+      }
+      .front {
+        background: center/200% url(https://user-images.githubusercontent.com/232306/167685449-9841eefe-a2c0-488e-9743-a7f6c3ca2ac8.png);
+        color: white;
+      }
+      .front h1 {
+        font-size: 100px;
+      }
+      .front a {
+        color: grey;
+      }
+      img {
+      	margin-left: -6rem;
+      	margin-top: -1.5rem;
+      }
+      
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle, front
+
+# <b><i>passcake</i></b><br> browser-based encrypted credentials/notes
+
+#### "Grainfields Close-up At Golden Hour" by Daniela Simona Temneanu from NounProject.com       
+???
+
+Notes go here and will be in the source but not displayed
+---
+
+## outline
+
+1. passwords are going to be around for a bit
+1. scratching my own itch
+1. architecture
+1. demonstration
+1. potential uses and future work
+---
+
+## passwords are going to be around for a bit
+
+- most existing well-maintained sites still offer email/password logins. ([airbnb](https://www.airbnb.com/signup_login) offers many authentication options, email and password are still present)
+- websites without active development teams will offer email/password for the foreseeable future. (small organizations, community sites, ...)
+- keeping those passwords safe is fraught and difficult across devices
+      
+???
+
+
+---
+
+## scratching my own itch
+
+- i currently use an encrypted text file and copy-paste - i want to do better
+- reduce dependencies on a third-parties for this service if possible
+- copy-paste is more insecure than i thought!
+- browser extensions seem like a ___weak___ link in the chain
+- could i run this kind of service myself and administer it for use by my family?
+
+???
+
+
+---
+
+## architecture (Alice is client, Bob is server)
+
+An OPAQUE credential file is created for each user using an OPAQUE register flow and stored in KV for general authentication
+and listing of the credentials (in the diagram below: Gmail, Amazon,...) saved by that user.
+
+![OPAQUE register](https://user-images.githubusercontent.com/232306/167722486-0672fbbc-abb2-4a79-9e49-e6595ff0090b.png)
+
+???
+
+
+---
+
+## architecture (Alice is client, Bob is server)
+
+Each credential stored by a user is another OPAQUE register flow followed by an OPAQUE auth flow during which the user 
+AES encrypts their secret using the stable __export_key__ resulting from auth and transmits 
+that blob using the __session_key__ that server and client share per auth exchange. By convention, sending a data blob during auth stores 
+that encrypted data and not sending one retrieves the existing encrypted data.
+
+![OPAQUE auth](https://user-images.githubusercontent.com/232306/167722592-348965aa-2ed3-49b2-a685-21c8b1335efd.png)
+
+???
+
+
+---
+
+## architecture (data store)
+
+Workers KV contains entries like the following:
+
+```json
+{ key: "my@email.com", data: "", 
+  metadata: { 
+    credential_file: "<OPAQUE credential file>", url: "" 
+  } 
+}
+```
+which are used for general authentication (and used when returning a list of KV key prefixes for a user to populate the credential list). 
+
+An entry is also present <u>per saved credential</u> with key ```"<identity>:<name>:(identifier)"```. These contain the 
+encrypted secret data and may optionally include a ___url___ that can be used for navigating to the site for that credential:
+```json
+
+{ key: "my@email.com:Gmail:gmail_identifier", data: "<AES encryped blob>", 
+  metadata: { 
+    credential_file: "<OPAQUE credential file>", 
+    url: "https://accounts.google.com" }
+  } 
+}
+```
+
+
+???
+
+---
+<video src="https://user-images.githubusercontent.com/232306/167738645-23337ee7-1399-402c-a0fb-8087f383d310.mp4" width="660" controls>
+</video> 
+
+???
+
+---
+<video src="https://user-images.githubusercontent.com/232306/167739848-cce0be26-37aa-4043-a319-7d2f0bee79cd.mp4" width="660" controls>
+</video> 
+
+???
+
+---
+<video src="https://user-images.githubusercontent.com/232306/167740146-544ca6b0-5465-4216-acc7-4101ef9b43f0.mp4" width="660" controls>
+</video> 
+
+???
+
+---
+## potential uses and future work
+
+- bring back the idea of setting a browser "home page" (that is not a search box!)
+- add icons for browser health (to indicate things like "are my DNS queries private?") so this information is always visible
+- allow deletion and editing of credentials
+- make user interface more attractive
+- get touch bookmarklet to work right for mobile
+- improve mouse bookmarklet
+
+???
+
+
+</nav>
+
+     
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js" type="text/javascript">
+    </script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
