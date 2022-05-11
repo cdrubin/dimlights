@@ -33,7 +33,8 @@
       }
       img {
       	margin-left: -6rem;
-      	margin-top: -1.5rem;
+      	margin-top: -1rem;
+      	z-index: -10;
       }
       
     </style>
@@ -74,7 +75,7 @@ Notes go here and will be in the source but not displayed
 ## scratching my own itch
 
 - i currently use an encrypted text file and copy-paste - i want to do better
-- reduce dependencies on a third-parties for this service if possible
+- minimal dependencies on a third-parties if possible
 - copy-paste is more insecure than i thought!
 - browser extensions seem like a ___weak___ link in the chain
 - could i run this kind of service myself and administer it for use by my family?
@@ -86,10 +87,10 @@ Notes go here and will be in the source but not displayed
 
 ## architecture (Alice is client, Bob is server)
 
-An OPAQUE credential file is created for each user using an OPAQUE register flow and stored in KV for general authentication
+An OPAQUE credential file is created for each user in an OPAQUE register flow and stored in KV for general authentication
 and listing of the credentials (in the diagram below: Gmail, Amazon,...) saved by that user.
 
-![OPAQUE register](https://user-images.githubusercontent.com/232306/167722486-0672fbbc-abb2-4a79-9e49-e6595ff0090b.png)
+![OPAQUE register](https://user-images.githubusercontent.com/232306/167886349-c3e210b5-7155-40e9-bbd4-a4ac0884a676.png)
 
 ???
 
@@ -103,7 +104,7 @@ AES encrypts their secret using the stable __export_key__ resulting from auth an
 that blob using the __session_key__ that server and client share per auth exchange. By convention, sending a data blob during auth stores 
 that encrypted data and not sending one retrieves the existing encrypted data.
 
-![OPAQUE auth](https://user-images.githubusercontent.com/232306/167722592-348965aa-2ed3-49b2-a685-21c8b1335efd.png)
+![OPAQUE auth](https://user-images.githubusercontent.com/232306/167886773-838893ec-07ae-4419-9e07-df38f3f9eb73.png)
 
 ???
 
@@ -167,9 +168,9 @@ encrypted secret data and may optionally include a ___url___ that can be used fo
 
 - enter OPAQUE password and authenticate (OPAQUE auth) to return list of existing saved credentials
 - submitting entered credential details first creates a new OPAQUE __credential file__ for the user (OPAQUE register) with KV key that includes name and optionally an identifier (username/email) and url
-- then clien authenticates against the new credential (OPAQUE auth init) which returns _session_key_ and _export_key_ to client
-- client AES encrypts their secret with _export_key_, then AES re-encrypts with _session_key_ and sends to server during OPAQUE auth finish
-- server decrypts data with _session_key_ and stores AES encrypted secret with the OPAQUE __credential file__ for that key
+- client authenticates against the new credential (OPAQUE auth init) which returns __session key__ and __export key__ to client
+- client AES encrypts their secret with __export key__, then AES re-encrypts with __session_key__ and sends to server during OPAQUE auth finish
+- server decrypts data with __session key__ and stores AES encrypted secret with the OPAQUE __credential file__ for that key
       
 ---
 <video src="https://user-images.githubusercontent.com/232306/167739848-cce0be26-37aa-4043-a319-7d2f0bee79cd.mp4" width="660" controls>
@@ -186,7 +187,7 @@ encrypted secret data and may optionally include a ___url___ that can be used fo
 - click bookmarklet, select target field for password entry
 - postMessage listener created (and visual mark added)
 - return to passcake tab and click 'passcake' button 
-- OPAQUE authenticate to credential to retrieve stored secret and use _export_key_ to decrypt
+- OPAQUE authenticate to credential to retrieve stored secret and use __export key__ to decrypt
 - postMessage secret to opened window
 - opened window captures message containing password and enters value in field selected earlier by bookmarklet, yum
       
