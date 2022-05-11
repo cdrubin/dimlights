@@ -10,8 +10,11 @@
 
       body, li { font-family: 'Droid Serif'; }
       li {
-      	font-size: larger;
+      	/*font-size: larger;*/
       	padding-bottom: 1rem;
+      }
+      li li {
+      	padding-bottom: 0.5rem;
       }
       h1, h2, h3 {
         font-family: 'Yanone Kaffeesatz';
@@ -56,8 +59,8 @@ Notes go here and will be in the source but not displayed
 
 1. passwords are going to be around for a bit
 1. scratching my own itch
-1. architecture
 1. demonstration
+1. architecture
 1. potential uses and future work
 ---
 
@@ -82,15 +85,63 @@ Notes go here and will be in the source but not displayed
 
 ???
 
+---
+## demonstration (registration)
+      
+- register user
+- save the resulting link for new homepage as a bookmark
+- copy and save the passcake bookmarklet as a bookmark
+
+---
+      
+<video src="https://user-images.githubusercontent.com/232306/167738645-23337ee7-1399-402c-a0fb-8087f383d310.mp4" width="660" controls>
+</video> 
+
+???
+
+---
+## demonstration (add a credential)
+
+- enter password and authenticate to return list of saved credentials
+- submit a new credential
+  - optional URL for the site to allow opening
+  - optional identifier to be copied to the clipboard    
+---
+<video src="https://user-images.githubusercontent.com/232306/167739848-cce0be26-37aa-4043-a319-7d2f0bee79cd.mp4" width="660" controls>
+</video> 
+
+???
+
+---
+## demonstration (use a credential)
+
+- enter password and authenticate to return list of saved credentials
+- click on item to open that website, which:
+  - copies identifier to the clipboard
+  - keeps a reference to the newly opened window
+  - removes the window.opener reference
+
+- in newly opened window paste identifier from clipboard, progress to password field entry and click bookmarklet, which:
+  - tries to identify the HTML element
+  - registers an event listener
+
+- return to ___passcake___ window and click <button>passcake</button> button on credential, which
+  - accesses password and sends it to the opened window 
+
+---
+<video src="https://user-images.githubusercontent.com/232306/167740146-544ca6b0-5465-4216-acc7-4101ef9b43f0.mp4" width="660" controls>
+</video> 
+
+???
 
 ---
 
 ## architecture (Alice is client, Bob is server)
 
 An OPAQUE credential file is created for each user in an OPAQUE register flow and stored in KV for general authentication
-and listing of the credentials (in the diagram below: Gmail, Amazon,...) saved by that user.
+and listing of the credentials saved by that user.
 
-![OPAQUE register](https://user-images.githubusercontent.com/232306/167886349-c3e210b5-7155-40e9-bbd4-a4ac0884a676.png)
+![OPAQUE register](https://user-images.githubusercontent.com/232306/167926556-ba35423e-f094-4f87-8a5d-1504f3a55931.png)
 
 ???
 
@@ -100,8 +151,8 @@ and listing of the credentials (in the diagram below: Gmail, Amazon,...) saved b
 ## architecture (Alice is client, Bob is server)
 
 Each credential stored by a user is another OPAQUE register flow followed by an OPAQUE auth flow during which the user 
-AES encrypts their secret using the stable __export_key__ resulting from auth and transmits 
-that blob using the __session_key__ that server and client share per auth exchange. By convention, sending a data blob during auth stores 
+AES encrypts their secret using the stable __export key__ resulting from auth and transmits 
+that blob using the __session key__ that server and client share per auth exchange. By convention, sending a data blob during auth stores 
 that encrypted data and not sending one retrieves the existing encrypted data.
 
 ![OPAQUE auth](https://user-images.githubusercontent.com/232306/167886773-838893ec-07ae-4419-9e07-df38f3f9eb73.png)
@@ -147,68 +198,23 @@ encrypted secret data and may optionally include a ___url___ that can be used fo
 - to avoid copying sensitive data to the clipboard passwords can be sent using the browser postMessage API from the passcake page to windows that it has opened 
 - a postMessage listener is registed on the receiving window, user returns to the passcake window and then a message with password is sent to the receiver
 
-      ### ...passwords a piece of cake ...passcake ...pass-the-cake ...OPAQUE ...pake ...cake ...mmmm.
+###<center>passwords a piece of cake ...pass-the-cake ...OPAQUE ...PAKE ...cake ...mmmm.</center>
+
+---
+## notes
+
+- ___passcake___ can only <tt>postMessage</tt> to windows that it has opened
+- every credential item opens a specific window and saves that reference so that <button>passcake</button> can only send the secret to that particular window.
       
----
-## demonstration (registration)
-      
-- register by creating a credential file for the user (OPAQUE register)
-- save the new homepage as a bookmark
-- copy and save the passcake bookmarklet as a bookmark
-
----
-      
-<video src="https://user-images.githubusercontent.com/232306/167738645-23337ee7-1399-402c-a0fb-8087f383d310.mp4" width="660" controls>
-</video> 
-
-???
-
----
-## demonstration (add a credential)
-
-- enter OPAQUE password and authenticate (OPAQUE auth) to return list of existing saved credentials
-- submitting entered credential details first creates a new OPAQUE __credential file__ for the user (OPAQUE register) with KV key that includes name and optionally an identifier (username/email) and url
-- client authenticates against the new credential (OPAQUE auth init) which returns __session key__ and __export key__ to client
-- client AES encrypts their secret with __export key__, then AES re-encrypts with __session_key__ and sends to server during OPAQUE auth finish
-- server decrypts data with __session key__ and stores AES encrypted secret with the OPAQUE __credential file__ for that key
-      
----
-<video src="https://user-images.githubusercontent.com/232306/167739848-cce0be26-37aa-4043-a319-7d2f0bee79cd.mp4" width="660" controls>
-</video> 
-
-???
-
----
-## demonstration (use a credential)
-
-- enter OPAQUE password and authenticate (OPAQUE auth) which returns list of existing saved credentials
-- click on item client copies identifier to the clipboard for ease of use
-- on opened page paste the identifier, progress to password field
-- click bookmarklet, select target field for password entry
-- postMessage listener created (and visual mark added)
-- return to passcake tab and click 'passcake' button 
-- OPAQUE authenticate to credential to retrieve stored secret and use __export key__ to decrypt
-- postMessage secret to opened window
-- opened window captures message containing password and enters value in field selected earlier by bookmarklet, yum
-      
----
-<video src="https://user-images.githubusercontent.com/232306/167740146-544ca6b0-5465-4216-acc7-4101ef9b43f0.mp4" width="660" controls>
-</video> 
-
-???
-
 ---
 ## potential uses and future work
 
-- bring back the idea of setting a browser "home page" (that is not a search box!)
+- bring back the idea of setting a browser "home page" (that is not search!)
 - add icons for browser health (to indicate things like "are my DNS queries private?") so this information is always visible
 - allow deletion and editing of credentials
 - make user interface more attractive
 - get touch bookmarklet to work right for mobile
 - improve mouse bookmarklet
-
-???
-
 
 </nav>
 
