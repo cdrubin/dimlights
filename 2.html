@@ -139,17 +139,57 @@ encrypted secret data and may optionally include a ___url___ that can be used fo
 ???
 
 ---
+## architecture (client behaviour)
+      
+- the ___passcake___ webpage intends to operate like a list of bookmarks (for those credentials that include a URL)
+- when a link is clicked the identifier value (for those credentials that include one) is copied to the clipboard before the url is opened in a new window
+- to avoid copying sensitive data to the clipboard passwords can be sent using the browser postMessage API from the passcake page to windows that it has opened 
+- a postMessage listener is registed on the receiving window, user returns to the passcake window and then a message with password is sent to the to the receiver
+
+      ### ... passwords a piece of cake, passcake, pass-the-cake, OPAQUE, pake, cake, mmmm.
+      
+---
+## demonstration (registration)
+      
+- register user by creating a credential file for the user (OPAQUE register)
+- save the new homepage as a bookmark
+- copy and save the passcake bookmarklet as a bookmark
+
+---
+      
 <video src="https://user-images.githubusercontent.com/232306/167738645-23337ee7-1399-402c-a0fb-8087f383d310.mp4" width="660" controls>
 </video> 
 
 ???
 
 ---
+## demonstration (add a credential)
+
+- enter OPAQUE password and authenticate (OPAQUE auth) which returns list of existing saved credentials
+- start by creating a new credential file for the user (OPAQUE register) with KV key that includes name and optionally an identifier (username/email) and url
+- begin authentication against the new credential (OPAQUE auth_init) and return _session_key_ and _export_key_ to client
+- client AES encrypts their secret with _export_key_, and sends to server AES re-encrypted with _session_key_
+- server decrypts data with _session_key_ and stores AES encrypted secret with the OPAQUE credential_file for that key
+      
+---
 <video src="https://user-images.githubusercontent.com/232306/167739848-cce0be26-37aa-4043-a319-7d2f0bee79cd.mp4" width="660" controls>
 </video> 
 
 ???
 
+---
+## demonstration (use a credential)
+
+- enter OPAQUE password and authenticate (OPAQUE auth) which returns list of existing saved credentials
+- click a link, client copies identifier (username/email) to the clipboard for ease of use
+- on opened page paste the identier and progress to password field
+- click passcake bookmarklet, select target field for password entry
+- postMessage listener created (and visual mark added)
+- return to passcake tab and click 'passcake' button 
+- OPAQUE authenticate to credential to retrieve stored secret and use _export_key_ to decrypt
+- postMessage secret to opened window
+- opened window captures message containing password and enters value in field
+      
 ---
 <video src="https://user-images.githubusercontent.com/232306/167740146-544ca6b0-5465-4216-acc7-4101ef9b43f0.mp4" width="660" controls>
 </video> 
