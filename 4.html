@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>distroless, execline, kind and skaffold - smaller surface, local</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body, li { font-family: 'Droid Serif'; }
+      li {
+      	/*font-size: larger;*/
+      	padding-bottom: 1rem;
+      }
+      li li {
+      	padding-bottom: 0.5rem;
+      }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      h4 {
+        text-align: right;
+      }
+      .front {
+        background: center/200% url(https://private-user-images.githubusercontent.com/232306/405232302-b384b127-ed12-48c6-bda9-8c6f5a14e0ea.jpg?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mzc0NjU0NzMsIm5iZiI6MTczNzQ2NTE3MywicGF0aCI6Ii8yMzIzMDYvNDA1MjMyMzAyLWIzODRiMTI3LWVkMTItNDhjNi1iZGE5LThjNmY1YTE0ZTBlYS5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUwMTIxJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MDEyMVQxMzEyNTNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00NDIwM2MxNzEzNjdhYTgwYzRlNzgyMTkxOTlkMTBlMGFkOWU2MDY3ZmQxYzM1YWFiMGM0Zjg0MDZmNmY5OTI4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.wJrZtX5k3ai6jr8defrgMLEsSS8R3qK4I1-yZecuFwg);
+        color: white;
+      }
+      .front h1 {
+        font-size: 100px;
+		text-shadow:
+    		-1px -1px 0 #000,  
+     		1px -1px 0 #000,
+    		-1px  1px 0 #000,
+     		1px  1px 0 #000;        
+      }
+      .front a {
+        color: grey;
+      }
+      img {
+      	margin-left: -6rem;
+      	margin-top: -1rem;
+      	z-index: -10;
+      }
+      
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle, front
+
+# <b><i>distroless, execline, kind and skaffold</i></b><br> smaller surface, local
+
+???
+
+Notes go here and will be in the source but not displayed
+---
+
+## outline
+
+1. less os in a container
+1. why is more helpful though?
+1. some common solutions
+1. reducing scripting language surface area
+1. local kubernetes versus docker compose
+1. hot-reloading during development
+---
+
+## less os in a container
+
+google recommends the use of [distroless](https://github.com/GoogleContainerTools/distroless) images to:
+ - improve signal to noise ratio for cve scanners
+ - reduce container image sizes
+ - restrict number of user applications
+
+these image should usually:
+ - only contain application runtime requirements
+ - ___not___ contain a shell
+      
+???
+
+
+---
+
+## why is more helpful though?
+
+we may want more applications in a container image:
+ 1. to run tasks at start up, like changing fs permissions
+ 1. to run periodic tasks, like backups
+ 1. to provide visibility for the primary application
+
+
+ ...and because a container running just a single process may not be feasible
+
+
+???
+
+---
+
+## some common solutions
+
+ 1. to run tasks at start up, like changing fs permissions
+ 		initContainers run at startup and can do much of this work
+ 
+ 1. to run periodic tasks, like backups
+		kubernetes supports Cronjobs! ...but which launch separate pods
+		
+ 1. to provide visibility for the primary application
+ 		we still want prometheus to be running in the same container
+
+
+(ephemeral containers are interesting too, but getting access to the required shared resources, like processes and file mounts, may not be possible)
+
+???
+
+---
+
+## reducing scripting language surface area
+
+we want _some_ scripting for the flexibility to easily launch background processes and manipulate file streams... but not _too_ much!
+
+[execline](https://skarnet.org/software/execline/) may be just the [ticket](https://danyspin97.org/blog/getting-started-with-execline-scripting/):
+
+ - minimal number of commands, include exactly the ones you want
+ - execline is a linear script, every command does one thing and cedes control to the following command which assumes the process (as `exec` replaces the current program in the current process)
+
+```
+foreground { echo "about to background dots" } 
+background { 
+  loopwhilex 
+    foreground { sleep 1 } foreground { echo "." } 
+  } 
+importas dots_pid !
+foreground { sleep 5 }
+foreground { echo "about to end background process" }
+kill $dots_pid
+```
+
+<br>
+(and a restrictive [busybox](https://www.busybox.net/) build can give us precisely the additional user commands necessary, while leaving a shell <ins>out</ins> of the build)
+
+???
+
+---
+
+## local kubernetes versus docker compose
+
+ - docker includes a 
+
+
+
+???
+
+---
+
+## simulator
+
+### [lavarand simulator](./lavarand-simulator.html)
+
+???
+
+
+
+</nav>
+
+     
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js" type="text/javascript">
+    </script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
