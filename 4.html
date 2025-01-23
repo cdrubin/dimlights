@@ -25,7 +25,7 @@
         text-align: right;
       }
       .front {
-        background: center/200% url(img/405232302-b384b127-ed12-48c6-bda9-8c6f5a14e0ea.jpg?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mzc0NjU0NzMsIm5iZiI6MTczNzQ2NTE3MywicGF0aCI6Ii8yMzIzMDYvNDA1MjMyMzAyLWIzODRiMTI3LWVkMTItNDhjNi1iZGE5LThjNmY1YTE0ZTBlYS5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUwMTIxJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MDEyMVQxMzEyNTNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT00NDIwM2MxNzEzNjdhYTgwYzRlNzgyMTkxOTlkMTBlMGFkOWU2MDY3ZmQxYzM1YWFiMGM0Zjg0MDZmNmY5OTI4JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.wJrZtX5k3ai6jr8defrgMLEsSS8R3qK4I1-yZecuFwg);
+        background: center/200% url(img/405232302-b384b127-ed12-48c6-bda9-8c6f5a14e0ea.jpg);
         color: white;
       }
       .front h1 {
@@ -122,7 +122,7 @@ we may want more applications in a container image:
 
 we want _some_ scripting for the flexibility to easily launch background processes and manipulate file streams... but not _too_ much!
 
-[execline](https://skarnet.org/software/execline/) may be just the [ticket](https://danyspin97.org/blog/getting-started-with-execline-scripting/):
+<b>[execline](https://skarnet.org/software/execline/)</b> may be just the [ticket](https://danyspin97.org/blog/getting-started-with-execline-scripting/):
 
  - minimal number of commands, include exactly the ones you want
  - execline is a linear script, every command does one thing and cedes control to the following command which assumes the process (as `exec` replaces the current program in the current process)
@@ -140,7 +140,7 @@ kill $dots_pid
 ```
 
 <br>
-(and a restrictive [busybox](https://www.busybox.net/) build can give us precisely the additional user commands necessary, while leaving a shell <ins>out</ins> of the build)
+(and a restrictive <b>[busybox](https://www.busybox.net/)</b> build can give us precisely the additional user commands necessary, while leaving a shell <ins>out</ins> of the build)
 
 ???
 
@@ -148,17 +148,49 @@ kill $dots_pid
 
 ## local kubernetes versus docker compose
 
- - docker includes a 
+docker <b>compose</b> enables composition of multiple docker containers
+ - this configuration is distinct from <u>and</u> different to kubernetes manifests
+ - networks, links are not compatible...
+
+but docker compose <i>does</i> allow for local container development and...
+
+ - some kinds of hot-reloading for changes ❤️
 
 
+<br>
+
+<b>[kind](https://kind.sigs.k8s.io/)</b> allows one to run a local kubernetes cluster <u>within</u> two containers 
+
+and can include customized cluster support to simulate production like: 
+ - the contour ingress controller
+
+but like kubernetes clusters, no hot-reloading
 
 ???
 
 ---
 
-## simulator
+## hot-reloading during development
 
-### [lavarand simulator](./lavarand-simulator.html)
+why is this notion born from web-development important?
+
+kubernetes applications are usually built within an image which is usually 
+built from an existing base image (like distroless) <br>
+
+and when changes are made there can be a long wait:
+
+  ...image rebuild (which may include building of binaries!)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;  ...new image push to registry <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  ...existing pod termination <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  ...new pod creation, initContainers run<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  ...new containers started (with our changes)
+
+and iterate? eek.
+
+<b>[skaffold](https://skaffold.dev/)</b> adds the following for a little better ergonomics:
+ - watching of kubernetes manifests for automatic application of changes
+ - watching of Dockerfiles for rebuilds, pushes, and deployments
+ - (optional) watching of source directories for sync to running container
 
 ???
 
