@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>basic scaling in kubernetes</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+      @import url(font/Yanone+Kaffeesatz.css);
+      @import url(font/Droid+Serif:400,700,400italic.css);
+      @import url(font/Ubuntu+Mono:400,700,400italic.css);
+
+      body, li { font-family: 'Droid Serif'; }
+      li {
+      	/*font-size: larger;*/
+      	padding-bottom: 1rem;
+      }
+      li li {
+      	padding-bottom: 0.5rem;
+      }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      h4 {
+        text-align: right;
+      }
+      .front {
+        /* background: center/200% url(img/405232302-b384b127-ed12-48c6-bda9-8c6f5a14e0ea.jpg); */
+        color: white;
+      }
+      .front h1 {
+        font-size: 100px;
+		text-shadow:
+    		-1px -1px 0 #000,  
+     		1px -1px 0 #000,
+    		-1px  1px 0 #000,
+     		1px  1px 0 #000;        
+      }
+      .front a {
+        color: grey;
+      }
+      img {
+      	margin-left: -6rem;
+      	margin-top: -1rem;
+      	z-index: -10;
+      }
+      .remark-code {
+      	font-size: 1.1rem;
+      }
+      img { 
+        width: 28rem;
+      }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle, front
+
+# <b><i>basic scaling in kubernetes
+
+???
+
+Notes go here and will be in the source but not displayed
+---
+
+## outline
+
+1. oft preferred - horizontal scaling
+1. the reality of inherent complexity
+1. a basic usecase: responding to requests
+1. demonstration
+---
+
+## oft preferred - horizontal scaling
+
+sevices with dynamic resource requirements get dynamic scaling
+
+<br>
+required:
+ - a description of the resources
+ - load balancing or other distribution across resources
+ - automatic adaptation to changes in load
+
+more visitors or a larger workload &rarr; 
+ - more of the same compute 'nodes' made available = horizontal scaling
+ - same number of nodes, but made more powerful = vertical scaling
+
+preferred because of potential for _resilience_, _repeatability_, <br>
+ &nbsp;&nbsp;&nbsp;  _fewer sizes/snowflakes_ <br>
+ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;... containers!
+
+???
+
+
+---
+
+## the reality of inherent complexity
+
+containers are the "right-sized" repeatable compute units<br>
+kubernetes is the most popular system for enabling horizontal scaling
+
+<br>
+it is also very flexible, and awash with YAML (or JSON)
+
+<br>
+but how does it do it? 
+
+???
+
+__manifests__ are the name given to resource definitions
+
+extensions are built as _custom_ resource definitions (CRDs)<br>
+(which are usually built with the basic resources provided by kubernetes)
+
+
+<pre>nginx-ingress</pre> is an example of how an ingress controller can be just nginx underneath
+
+
+---
+
+## declarations of inherent complexity
+
+__manifests__ are the name given to resource definitions
+
+Objects are declared in these YAML resource definitions that the Kubernetes
+engine manages all of the automation for.
+
+Kubernetes extensions are built as _custom_ resource definitions (CRDs)<br>
+ &nbsp;&nbsp;&nbsp; (which are built from already defined resource definitions)
+
+
+For our example we'll create a:
+
+ - ___Deployment___<br> 
+     (which creates Pods, which are compute units, composed of containers)
+ - ___Service___<br>
+     (which make Pod ports available)
+ - ___HorizontalPodAutoscaler___<br> 
+     (which is a CRD for scaling based on Pod metrics)
+
+
+???
+extensions are built as _custom_ resource definitions (CRDs)<br>
+(which are usually built with the basic resources provided by kubernetes)
+
+
+<pre>nginx-ingress</pre> is an example of how an ingress controller can be just nginx underneath
+
+
+???
+
+---
+
+## deploying inherent complexity
+
+ - ___Deployment___<br> 
+     (which creates Pods, which are compute units, composed of containers)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 10m
+```
+
+---
+
+## servicing inherent complexity
+
+ - ___Service___<br> 
+     (which makes Pod ports available)
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: nginx
+```
+
+---
+
+## scaling inherent complexity
+
+ - ___HorizontalPodAutoscaler___<br> 
+     (which is a CRD for scaling based on Pod metrics)
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nginx-scaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nginx-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: 
+            type: Utilization
+            averageUtilization: 10
+```
+
+
+---
+
+## demo
+
+![GitHub](https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png)<br>
+https://github.com/cdrubin/k8s-auto-scale-nginx
+
+???
+
+---
+
+
+
+
+</nav>
+
+     
+    </textarea>
+    <script src="js/remark-latest.min.js" type="text/javascript">
+    </script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
