@@ -1,0 +1,974 @@
+<!doctype html>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>apejs network1</title>
+<style>
+:root { --pitch: 196px; --bit: 34px; --ink: #14181d; --bg: #dfe6f0; --tray: #b9c6da; --well: #fff; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--ink);
+  font: 16px system-ui, sans-serif; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+main { height: 100%; display: grid; grid-template-rows: 1fr 1fr; position: relative; }
+button { font: inherit; min-height: 44px; min-width: 44px; padding: 0 16px; border: 2px solid var(--ink);
+  border-radius: 10px; background: #fff; color: var(--ink); touch-action: manipulation; cursor: pointer; }
+button:disabled { opacity: .35; } button.on { background: var(--ink); color: #fff; }
+
+/* ---- top: memory ---- */
+.mem { position: relative; display: grid; grid-template-columns: auto minmax(0, 420px) 1fr auto; grid-template-rows: auto 1fr; gap: 0 10px; padding: 10px 10px 0; border-bottom: 3px solid var(--ink); }
+.strip { grid-row: 2; grid-column: 1 / -1; margin: 0 -10px; position: relative; min-width: 0; overflow: hidden; touch-action: none; cursor: grab; }
+.strip.dragging { cursor: grabbing; }
+.track { position: absolute; left: 0; top: 0; bottom: 0; align-items: center; display: flex; transition: transform .6s cubic-bezier(.3,.7,.3,1); }
+.strip.dragging .track { transition: none; }
+.crate { position: relative; width: var(--pitch); flex: none; padding: 0 10px; text-align: center; transition: opacity .3s; }
+.wells { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; background: var(--tray);
+  border-radius: 16px; border: 3px solid #8fa0bb; }
+.del, .ins { position: absolute; z-index: 3; width: 38px; height: 38px; min-width: 0; min-height: 0; padding: 0; border-radius: 50%;
+  font: 700 24px/1 system-ui, sans-serif; display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+.del { top: -14px; right: 0; background: #e8452c; color: #fff; }
+.insz { position: absolute; z-index: 2; left: -20px; top: 0; width: 40px; height: 100%; display: grid; place-items: center; }
+.crate:first-child .insz { left: 0; }
+.ins { position: static; background: #1f9d4c; color: #fff; }
+.crate:hover .del, .insz:hover .ins, .del:focus-visible, .ins:focus-visible { opacity: 1; }
+@media (hover: none) { .del, .ins { opacity: .55; } }
+.crate.active .wells { border-color: var(--ink); }
+.crate.spent { opacity: .45; }
+.dot { aspect-ratio: 1; border-radius: 3px; background: var(--well); box-shadow: inset 0 3px 5px rgba(0,0,0,.3);
+  touch-action: none; }
+.dot.on { background: var(--ink); box-shadow: inset 0 3px 5px rgba(255,255,255,.25); }
+.dot.cursor { outline: 4px solid #e8452c; outline-offset: 2px; }
+.cap { margin-top: 6px; font: 700 22px ui-monospace, monospace; height: 28px; }
+.faint { opacity: .25; }
+.btns { grid-column: 4; display: flex; gap: 8px; align-items: start; }
+textarea { grid-column: 2; width: 100%; font: 18px ui-monospace, monospace; padding: 10px; border: 2px solid var(--ink);
+  border-radius: 10px; resize: none; user-select: text; -webkit-user-select: text; background: rgba(255,255,255,.92); }
+
+/* ---- 8 bit ASCII crates ---- */
+.vals { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; padding: 0 15px 4px; font: 700 12px ui-monospace, monospace; opacity: .7; }
+.wells.w8 { grid-template-columns: repeat(8, 1fr); }
+
+/* ---- magnified byte: a full-screen focus view over everything else (8-bit mode) ---- */
+.zoombtn { display: grid; place-items: center; padding: 0; width: 48px; }
+.zoombtn.on { background: var(--ink); color: #fff; }
+.zoomview { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; align-items: center; justify-content: center; gap: 14px; padding: 0 12px; }
+.zstep { flex: none; width: 56px; height: 80px; padding: 0; font-size: 26px; }
+.zhint { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; font-size: 14px; opacity: .55; pointer-events: none; }
+.crate.big { width: min(calc(100vw - 200px), 1400px); flex: 0 1 auto; padding: 0; }
+.crate.big .wells { gap: 14px; padding: 20px; border-radius: 22px; }
+.crate.big .dot { border-radius: 6px; }
+.crate.big .vals { gap: 14px; padding: 0 23px 8px; font-size: clamp(18px, 4.2vw, 72px); opacity: 1; }
+.crate.big .cap { font-size: clamp(24px, 5vw, 90px); height: auto; margin-top: 12px; }
+.crate.big .del, .crate.big .insz { display: none; }
+
+/* ---- mode tabs + character-set overlays (hover; tap the active tab on touch) ---- */
+.tabs { grid-column: 1; position: relative; display: grid; gap: 4px; align-content: start; }
+.tab { min-height: 40px; width: 150px; padding: 0 10px; font-weight: 600; }
+.tab.on { background: var(--ink); color: #fff; }
+.ov { display: none; position: absolute; top: 100%; left: 0; z-index: 30; width: min(640px, calc(100vw - 20px)); max-height: 78vh; overflow: auto;
+  padding: 12px; background: #fff; border: 3px solid var(--ink); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px 6px; }
+.tabwrap:hover .ov, .ov.show { display: grid; }
+.card { display: grid; justify-items: center; gap: 3px; font: 12px ui-monospace, monospace; }
+.card b { font-size: 16px; } .card small { opacity: .6; }
+.mini { display: grid; grid-template-columns: repeat(4, 10px); gap: 1px; }
+.mini.m8 { grid-template-columns: repeat(8, 8px); }
+.mini i { aspect-ratio: 1; background: #e3e8f0; } .mini i.on { background: var(--ink); }
+
+/* ---- title ribbons ---- */
+.ribbon { position: absolute; z-index: 1; top: 0; padding: 5px 30px 5px 16px; background: var(--ink); color: #fff; pointer-events: none;
+  font: 800 14px/1.2 system-ui, sans-serif; letter-spacing: .22em; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+.ribbon.sender { left: 50%; transform: translateX(-50%); padding: 5px 30px; clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 100%, 0 100%); }
+.ribbon.receiver { left: 0; }
+.ribbon.network { right: 0; padding: 5px 16px 5px 30px; clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%); }
+.net { position: relative; }
+
+/* ---- bottom: output + pipe ---- */
+.net { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+.out { position: relative; overflow: hidden; border-right: 3px solid var(--ink); background: #f7f9fc; }
+.out .scroll { height: 100%; overflow: auto; padding: 34px 70px 70px 18px; }
+.rawbits { display: flex; align-items: center; gap: 6px; min-height: 40px; font-size: 14px; }
+.rawbits input { width: 24px; height: 24px; }
+.clearout { position: absolute; right: 14px; bottom: 14px; }
+.title { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; opacity: .55; margin-bottom: 8px; }
+.decoded { font: 700 34px/1.3 ui-monospace, monospace; word-break: break-all; user-select: text; -webkit-user-select: text; }
+.decoded .raw { font-size: 14px; font-weight: 400; }
+.decoded .partial { font-size: 14px; opacity: .4; font-weight: 400; }
+.pipewrap { position: relative; display: flex; align-items: center; min-width: 0; }
+.netctl { position: absolute; top: 34px; right: 14px; display: grid; grid-template-columns: auto auto; justify-items: end; column-gap: 22px; font-size: 14px; }
+.netctl label { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.netctl input[type=checkbox] { width: 24px; height: 24px; }
+.netctl input[type=range] { width: 130px; height: 32px; touch-action: pan-y; }
+.pipe { position: relative; flex: 1; height: calc(var(--bit) + 22px); background: #8e9bb0; border-block: 4px solid var(--ink);
+  overflow: hidden; container-type: inline-size; box-shadow: inset 0 6px 10px rgba(0,0,0,.25); }
+.bit { position: absolute; left: 100%; top: 7px; width: var(--bit); height: var(--bit); background: #fff;
+  border: 2px solid var(--ink); animation: flow linear forwards; }
+.bit.one { background: var(--ink); }
+.bit.mark::before { content: ""; position: absolute; left: -8px; top: -9px; width: 4px; height: 48px; background: #e8452c; }
+@keyframes flow { to { transform: translateX(calc(-100cqw - var(--bit))); } }
+
+/* ---- the big play button, dead centre ---- */
+.play { position: fixed; left: 50%; top: 50%; width: 104px; height: 104px; margin: -52px 0 0 -52px; z-index: 5; padding: 0;
+  border-radius: 50%; font-size: 46px; line-height: 1; background: #e8452c; color: #fff; border: 5px solid var(--ink);
+  box-shadow: 0 6px 0 var(--ink); }
+.play:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--ink); }
+.play.pause { background: var(--ink); font-size: 36px; letter-spacing: -4px; }
+.stopbtn { position: fixed; left: 50%; top: calc(50% + 62px); transform: translateX(-50%); z-index: 5; }
+.pipe.paused .bit { animation-play-state: paused; }
+
+</style>
+<div id=app></div>
+<script>
+const __hyperapp = (() => {
+var SSR_NODE = 1
+var TEXT_NODE = 3
+var EMPTY_OBJ = {}
+var EMPTY_ARR = []
+var SVG_NS = "http://www.w3.org/2000/svg"
+
+var id = (a) => a
+var map = EMPTY_ARR.map
+var isArray = Array.isArray
+var enqueue =
+  typeof requestAnimationFrame !== "undefined"
+    ? requestAnimationFrame
+    : setTimeout
+
+var createClass = (obj) => {
+  var out = ""
+
+  if (typeof obj === "string") return obj
+
+  if (isArray(obj)) {
+    for (var k = 0, tmp; k < obj.length; k++) {
+      if ((tmp = createClass(obj[k]))) {
+        out += (out && " ") + tmp
+      }
+    }
+  } else {
+    for (var k in obj) {
+      if (obj[k]) out += (out && " ") + k
+    }
+  }
+
+  return out
+}
+
+var shouldRestart = (a, b) => {
+  for (var k in { ...a, ...b }) {
+    if (typeof (isArray(a[k]) ? a[k][0] : a[k]) === "function") {
+      b[k] = a[k]
+    } else if (a[k] !== b[k]) return true
+  }
+}
+
+var patchSubs = (oldSubs, newSubs = EMPTY_ARR, dispatch) => {
+  for (
+    var subs = [], i = 0, oldSub, newSub;
+    i < oldSubs.length || i < newSubs.length;
+    i++
+  ) {
+    oldSub = oldSubs[i]
+    newSub = newSubs[i]
+
+    subs.push(
+      newSub && newSub !== true
+        ? !oldSub ||
+          newSub[0] !== oldSub[0] ||
+          shouldRestart(newSub[1], oldSub[1])
+          ? [
+              newSub[0],
+              newSub[1],
+              (oldSub && oldSub[2](), newSub[0](dispatch, newSub[1])),
+            ]
+          : oldSub
+        : oldSub && oldSub[2]()
+    )
+  }
+  return subs
+}
+
+var getKey = (vdom) => (vdom == null ? vdom : vdom.key)
+
+var patchProperty = (node, key, oldValue, newValue, listener, isSvg) => {
+  if (key === "style") {
+    for (var k in { ...oldValue, ...newValue }) {
+      oldValue = newValue == null || newValue[k] == null ? "" : newValue[k]
+      if (k[0] === "-") {
+        node[key].setProperty(k, oldValue)
+      } else {
+        node[key][k] = oldValue
+      }
+    }
+  } else if (key[0] === "o" && key[1] === "n") {
+    if (
+      !((node.events || (node.events = {}))[(key = key.slice(2))] = newValue)
+    ) {
+      node.removeEventListener(key, listener)
+    } else if (!oldValue) {
+      node.addEventListener(key, listener)
+    }
+  } else if (!isSvg && key !== "list" && key !== "form" && key in node) {
+    node[key] = newValue == null ? "" : newValue
+  } else if (newValue == null || newValue === false) {
+    node.removeAttribute(key)
+  } else {
+    node.setAttribute(key, newValue)
+  }
+}
+
+var createNode = (vdom, listener, isSvg) => {
+  var props = vdom.props
+  var node =
+    vdom.type === TEXT_NODE
+      ? document.createTextNode(vdom.tag)
+      : (isSvg = isSvg || vdom.tag === "svg")
+      ? document.createElementNS(SVG_NS, vdom.tag, props.is && props)
+      : document.createElement(vdom.tag, props.is && props)
+
+  for (var k in props) {
+    patchProperty(node, k, null, props[k], listener, isSvg)
+  }
+
+  for (var i = 0; i < vdom.children.length; i++) {
+    node.appendChild(
+      createNode(
+        (vdom.children[i] = maybeVNode(vdom.children[i])),
+        listener,
+        isSvg
+      )
+    )
+  }
+
+  return (vdom.node = node)
+}
+
+var patch = (parent, node, oldVNode, newVNode, listener, isSvg) => {
+  if (oldVNode === newVNode) {
+  } else if (
+    oldVNode != null &&
+    oldVNode.type === TEXT_NODE &&
+    newVNode.type === TEXT_NODE
+  ) {
+    if (oldVNode.tag !== newVNode.tag) node.nodeValue = newVNode.tag
+  } else if (oldVNode == null || oldVNode.tag !== newVNode.tag) {
+    node = parent.insertBefore(
+      createNode((newVNode = maybeVNode(newVNode)), listener, isSvg),
+      node
+    )
+    if (oldVNode != null) {
+      parent.removeChild(oldVNode.node)
+    }
+  } else {
+    var tmpVKid
+    var oldVKid
+
+    var oldKey
+    var newKey
+
+    var oldProps = oldVNode.props
+    var newProps = newVNode.props
+
+    var oldVKids = oldVNode.children
+    var newVKids = newVNode.children
+
+    var oldHead = 0
+    var newHead = 0
+    var oldTail = oldVKids.length - 1
+    var newTail = newVKids.length - 1
+
+    isSvg = isSvg || newVNode.tag === "svg"
+
+    for (var i in { ...oldProps, ...newProps }) {
+      if (
+        (i === "value" || i === "selected" || i === "checked"
+          ? node[i]
+          : oldProps[i]) !== newProps[i]
+      ) {
+        patchProperty(node, i, oldProps[i], newProps[i], listener, isSvg)
+      }
+    }
+
+    while (newHead <= newTail && oldHead <= oldTail) {
+      if (
+        (oldKey = getKey(oldVKids[oldHead])) == null ||
+        oldKey !== getKey(newVKids[newHead])
+      ) {
+        break
+      }
+
+      patch(
+        node,
+        oldVKids[oldHead].node,
+        oldVKids[oldHead],
+        (newVKids[newHead] = maybeVNode(
+          newVKids[newHead++],
+          oldVKids[oldHead++]
+        )),
+        listener,
+        isSvg
+      )
+    }
+
+    while (newHead <= newTail && oldHead <= oldTail) {
+      if (
+        (oldKey = getKey(oldVKids[oldTail])) == null ||
+        oldKey !== getKey(newVKids[newTail])
+      ) {
+        break
+      }
+
+      patch(
+        node,
+        oldVKids[oldTail].node,
+        oldVKids[oldTail],
+        (newVKids[newTail] = maybeVNode(
+          newVKids[newTail--],
+          oldVKids[oldTail--]
+        )),
+        listener,
+        isSvg
+      )
+    }
+
+    if (oldHead > oldTail) {
+      while (newHead <= newTail) {
+        node.insertBefore(
+          createNode(
+            (newVKids[newHead] = maybeVNode(newVKids[newHead++])),
+            listener,
+            isSvg
+          ),
+          (oldVKid = oldVKids[oldHead]) && oldVKid.node
+        )
+      }
+    } else if (newHead > newTail) {
+      while (oldHead <= oldTail) {
+        node.removeChild(oldVKids[oldHead++].node)
+      }
+    } else {
+      for (var keyed = {}, newKeyed = {}, i = oldHead; i <= oldTail; i++) {
+        if ((oldKey = oldVKids[i].key) != null) {
+          keyed[oldKey] = oldVKids[i]
+        }
+      }
+
+      while (newHead <= newTail) {
+        oldKey = getKey((oldVKid = oldVKids[oldHead]))
+        newKey = getKey(
+          (newVKids[newHead] = maybeVNode(newVKids[newHead], oldVKid))
+        )
+
+        if (
+          newKeyed[oldKey] ||
+          (newKey != null && newKey === getKey(oldVKids[oldHead + 1]))
+        ) {
+          if (oldKey == null) {
+            node.removeChild(oldVKid.node)
+          }
+          oldHead++
+          continue
+        }
+
+        if (newKey == null || oldVNode.type === SSR_NODE) {
+          if (oldKey == null) {
+            patch(
+              node,
+              oldVKid && oldVKid.node,
+              oldVKid,
+              newVKids[newHead],
+              listener,
+              isSvg
+            )
+            newHead++
+          }
+          oldHead++
+        } else {
+          if (oldKey === newKey) {
+            patch(
+              node,
+              oldVKid.node,
+              oldVKid,
+              newVKids[newHead],
+              listener,
+              isSvg
+            )
+            newKeyed[newKey] = true
+            oldHead++
+          } else {
+            if ((tmpVKid = keyed[newKey]) != null) {
+              patch(
+                node,
+                node.insertBefore(tmpVKid.node, oldVKid && oldVKid.node),
+                tmpVKid,
+                newVKids[newHead],
+                listener,
+                isSvg
+              )
+              newKeyed[newKey] = true
+            } else {
+              patch(
+                node,
+                oldVKid && oldVKid.node,
+                null,
+                newVKids[newHead],
+                listener,
+                isSvg
+              )
+            }
+          }
+          newHead++
+        }
+      }
+
+      while (oldHead <= oldTail) {
+        if (getKey((oldVKid = oldVKids[oldHead++])) == null) {
+          node.removeChild(oldVKid.node)
+        }
+      }
+
+      for (var i in keyed) {
+        if (newKeyed[i] == null) {
+          node.removeChild(keyed[i].node)
+        }
+      }
+    }
+  }
+
+  return (newVNode.node = node)
+}
+
+var propsChanged = (a, b) => {
+  for (var k in a) if (a[k] !== b[k]) return true
+  for (var k in b) if (a[k] !== b[k]) return true
+}
+
+var maybeVNode = (newVNode, oldVNode) =>
+  newVNode !== true && newVNode !== false && newVNode
+    ? typeof newVNode.tag === "function"
+      ? ((!oldVNode ||
+          oldVNode.memo == null ||
+          propsChanged(oldVNode.memo, newVNode.memo)) &&
+          ((oldVNode = newVNode.tag(newVNode.memo)).memo = newVNode.memo),
+        oldVNode)
+      : newVNode
+    : text("")
+
+var recycleNode = (node) =>
+  node.nodeType === TEXT_NODE
+    ? text(node.nodeValue, node)
+    : createVNode(
+        node.nodeName.toLowerCase(),
+        EMPTY_OBJ,
+        map.call(node.childNodes, recycleNode),
+        SSR_NODE,
+        node
+      )
+
+var createVNode = (tag, { key, ...props }, children, type, node) => ({
+  tag,
+  props,
+  key,
+  children,
+  type,
+  node,
+})
+
+var memo = (tag, memo) => ({ tag, memo })
+
+var text = (value, node) =>
+  createVNode(value, EMPTY_OBJ, EMPTY_ARR, TEXT_NODE, node)
+
+var h = (tag, { class: c, ...props }, children = EMPTY_ARR) =>
+  createVNode(
+    tag,
+    { ...props, ...(c ? { class: createClass(c) } : EMPTY_OBJ) },
+    isArray(children) ? children : [children]
+  )
+
+var app = ({
+  node,
+  view,
+  subscriptions,
+  dispatch = id,
+  init = EMPTY_OBJ,
+}) => {
+  var vdom = node && recycleNode(node)
+  var subs = []
+  var state
+  var busy
+
+  var update = (newState) => {
+    if (state !== newState) {
+      if ((state = newState) == null) dispatch = subscriptions = render = id
+      if (subscriptions) subs = patchSubs(subs, subscriptions(state), dispatch)
+      if (view && !busy) enqueue(render, (busy = true))
+    }
+  }
+
+  var render = () =>
+    (node = patch(
+      node.parentNode,
+      node,
+      vdom,
+      (vdom = view(state)),
+      listener,
+      (busy = false)
+    ))
+
+  var listener = function (event) {
+    dispatch(this.events[event.type], event)
+  }
+
+  return (
+    (dispatch = dispatch((action, props) =>
+      typeof action === "function"
+        ? dispatch(action(state, props))
+        : isArray(action)
+        ? typeof action[0] === "function"
+          ? dispatch(action[0], action[1])
+          : action
+              .slice(1)
+              .map(
+                (fx) => fx && fx !== true && (fx[0] || fx)(dispatch, fx[1]),
+                update(action[0])
+              )
+        : update(action)
+    ))(init),
+    dispatch
+  )
+}
+
+return { h, text, app };
+})();
+const __font = (() => {
+// font.js — the 4x4 "Four Bit" pixel font (see 4x4font.jpg), shared by the
+// server (served at /font.js) and the browser app.
+//
+// A character is 16 bits, row-major: bit 0 = top-left dot, bit 15 = bottom-right.
+// '#' = 1 (black), '.' = 0 (white). Glyphs were sampled from 4x4font.jpg; the
+// image's M and W are 5 columns wide, so they are squeezed into 4 here, and O
+// is made distinct from the (slashed-looking) 0.
+const G = {
+  A: "####|##.#|####|##.#", B: "###.|#.##|##.#|####", C: ".###|##..|##..|.###",
+  D: "###.|##.#|##.#|###.", E: "####|###.|##..|####", F: "####|###.|##..|##..",
+  G: "####|##..|##.#|####", H: "##.#|####|####|##.#", I: "####|.##.|.##.|####",
+  J: "..##|..##|#.##|####", K: "##.#|###.|###.|##.#", L: "##..|##..|##..|####",
+  M: "####|####|#..#|#..#", N: "##.#|####|#.##|#.##", O: ".##.|#..#|#..#|.##.",
+  P: "####|##.#|####|##..", Q: ".##.|#..#|#.##|.###", R: "###.|##.#|###.|##.#",
+  S: "####|##..|..##|####", T: "####|.##.|.##.|.##.", U: "##.#|##.#|####|####",
+  V: "##.#|##.#|.###|..#.", W: "#..#|#..#|####|####", X: "##.#|.##.|.##.|##.#",
+  Y: "##.#|##.#|.##.|.##.", Z: "####|..##|##..|####",
+  0: ".##.|##.#|##.#|.##.", 1: "###.|.##.|.##.|.##.", 2: "###.|..#.|#...|###.",
+  3: "####|.###|..##|####", 4: "#.#.|#.#.|####|..#.", 5: "###.|#...|..#.|###.",
+  6: "####|#...|#.##|####", 7: "###.|..#.|.#..|#...", 8: "###.|#.##|##.#|.###",
+  9: "####|##.#|...#|####",
+  "!": "#...|#...|....|#...", "?": "###.|..#.|....|.#..",
+  "[": "##..|#...|#...|##..", "]": "##..|.#..|.#..|##..",
+  "-": "....|....|####|....", "*": "....|.##.|.##.|....", "|": ".#..|.#..|.#..|.#..",
+  "=": "....|####|####|....", "+": ".##.|####|####|.##.", ".": "....|....|....|#...",
+  "~": "....|....|.##.|....", "(": ".#..|#...|#...|.#..", "_": "....|....|#..#|.##.",
+  ")": "..#.|...#|...#|..#.", "^": ".##.|#..#|....|....",
+  " ": "....|....|....|....",
+};
+
+const bitsOf = (ch) => G[ch] ? G[ch].replace(/\|/g, "").split("").map((c) => c === "#" ? 1 : 0) : null;
+const CHARS = Object.keys(G);
+
+const BY_BITS = new Map(CHARS.map((c) => [bitsOf(c).join(""), c]));
+
+// 16 bits (array or "0101…" string) -> char, or null if unrecognised
+const decode = (bits) => BY_BITS.get(Array.isArray(bits) ? bits.join("") : bits) ?? null;
+// typed text -> list of 16-bit arrays (case-folded; unsupported chars dropped)
+const encode = (s) => [...s.toUpperCase()].map(bitsOf).filter(Boolean);
+
+// ---- 8-bit ASCII: one character = 8 bits, displayed 128 64 32 16 8 4 2 1 (left to right)
+const printable = (c) => c >= 32 && c <= 126;
+const asciiBits = (ch) => {
+  const c = ch.charCodeAt(0);
+  return printable(c) ? [...c.toString(2).padStart(8, "0")].map(Number) : null;
+};
+const codeOf = (bits) => parseInt(bits.join(""), 2);
+// 8 bits (display order) -> char, or null if it isn't printable ASCII (32..126)
+const decodeAscii = (bits) => { const c = codeOf(bits); return printable(c) ? String.fromCharCode(c) : null; };
+const encodeAscii = (s) => [...s].map(asciiBits).filter(Boolean);
+
+return { decode, encode, bitsOf, CHARS, decodeAscii, encodeAscii, asciiBits, codeOf };
+})();
+(() => {
+const { h, text, app } = __hyperapp;
+const { decode, encode, bitsOf, CHARS, decodeAscii, encodeAscii, asciiBits, codeOf } = __font;
+// ui.js — the browser app for `network1`, served at /ui.js as an ES module.
+//
+// TOP:    "memory" — a strip of crates, in one of two encodings (tabs):
+//           4x4 pixel font: 4x4 crates, 16 bits per character
+//           8 bit ASCII:    one row of 8 cells (128 64 32 16 8 4 2 1), 8 bits per character
+// BOTTOM: left = receiver (decodes the stream), right = the network pipe.
+// PLAY:   rewinds the strip to crate 0, then a cursor reads each crate's cells
+//         (see MODES.order) and puts a 1 (black) / 0 (white) square into the pipe.
+//         Squares slide right -> left; on arrival they are decoded, one
+//         character's worth of bits at a time ("?" when it isn't a known character).
+//
+// Input is Pointer Events throughout (mouse, pen and touch behave the same):
+// tap or drag across dots to paint, drag the strip to scroll through memory.
+
+// `order[j]` = the cell (display index, row-major / left-to-right) transmitted j-th.
+// Both modes read left to right: 4x4 starts top-left, moves right and wraps down;
+// ASCII sends the 128 bit first, i.e. the leftmost cell first.
+const MODES = {
+  font: { label: "4x4 pixel font", n: 16, pitch: 196, order: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], encode, decode },
+  ascii: { label: "8 bit ASCII", n: 8, pitch: 380, order: [0, 1, 2, 3, 4, 5, 6, 7], encode: encodeAscii, decode: decodeAscii },
+};
+let MODE = MODES.font;    // the active mode (switching is disabled while playing)
+let PITCH = MODE.pitch;   // px between crates (also set as --pitch on the track)
+const BIT = 34;           // px per pipe square (matches --bit)
+const GAP = 8;            // px between pipe squares (same as the crate dot gap)
+const blank = () => Array(MODE.n).fill(0);
+const isBlank = (c) => !c.some(Boolean);
+// the strip shares the top row with the input panel (see .mem in app.mjs)
+const stripWidth = () => document.querySelector(".strip")?.clientWidth || innerWidth - Math.min(320, innerWidth * 0.4);
+const slots = () => Math.max(1, Math.floor(stripWidth() / PITCH));
+// pos = index of the crate at the strip's left edge. "Follow" puts the newest crate
+// at the right edge (negative when memory is shorter than the screen); the
+// allowed range runs between that and the opening position (0).
+const maxPos = (n) => n - slots();
+const lim = (v, n) => clamp(v, Math.min(0, maxPos(n)), Math.max(0, maxPos(n)));
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+// ---- actions ---------------------------------------------------------------
+const withCrates = (s, crates, follow = true) =>
+  ({ ...s, crates, zk: follow ? null : s.zk, pos: follow ? maxPos(crates.length) : lim(s.pos, crates.length) });
+
+// Typed text: append => fill the active (last) crate and open a new one;
+// shorter => drop crates; any other edit => rebuild from the text.
+const EditText = (s, ev) => {
+  if (s.phase !== "idle") return s;
+  const next = ev.target.value, prev = s.text;
+  let crates = s.crates.slice();
+  const put = (bits) => {                       // commit `bits` into the active slot
+    if (!isBlank(crates[crates.length - 1])) crates.push(blank());
+    crates[crates.length - 1] = bits; crates.push(blank());
+  };
+  if (next.startsWith(prev)) MODE.encode(next.slice(prev.length)).forEach(put);
+  else if (prev.startsWith(next)) {
+    const drop = MODE.encode(prev.slice(next.length)).length;
+    for (let i = 0; i < drop && crates.length > 1; i++) crates.splice(crates.length - 2, 1);
+  } else { crates = [blank()]; MODE.encode(next).forEach(put); }
+  return withCrates({ ...s, text: next }, crates);
+};
+
+// hover controls on each crate: X deletes it, + inserts a blank crate before it
+const DeleteCrate = (s, k) => {
+  if (s.phase !== "idle" || s.crates.length < 2) return s;
+  const crates = s.crates.filter((_, j) => j !== k);
+  if (!isBlank(crates[crates.length - 1])) crates.push(blank());  // keep the active blank at the end
+  return withCrates(s, crates, false);
+};
+const InsertCrate = (s, k) => {
+  if (s.phase !== "idle") return s;
+  const crates = s.crates.slice(); crates.splice(k, 0, blank());
+  return withCrates(s, crates, false);
+};
+// tabs: switching re-encodes the typed text in the new mode (painted-only crates are
+// dropped). Tapping the active tab toggles the character-set overlay (for touch,
+// where there is no hover).
+const SetMode = (s, m) => {
+  if (s.phase !== "idle" || m === s.mode) return s;
+  MODE = MODES[m]; PITCH = MODE.pitch;
+  const crates = [...MODE.encode(s.text), blank()];
+  return { ...s, mode: m, help: null, crates, pos: maxPos(crates.length), out: [], partial: [], arrived: {}, next: 0, seq: 0, bits: [] };
+};
+const TabClick = (s, m) => m === s.mode ? { ...s, help: s.help === m ? null : m } : SetMode(s, m);
+const CloseHelp = (s) => ({ ...s, help: null });
+// magnifier (8-bit mode): show just one large crate -- the one being read while playing,
+// otherwise the newest (or the one stepped to with the arrows)
+const ToggleZoom = (s) => ({ ...s, zoom: !s.zoom });
+const focusK = (s) => s.phase !== "idle" ? (s.cur ? s.cur.k : s.data.length - 1) : s.zk == null ? s.crates.length - 1 : clamp(s.zk, 0, s.crates.length - 1);
+// a click that lands outside the crate and the arrows closes the focus view
+const ZoomAway = (s, ev) => ev.target.closest(".crate, .zstep") ? s : { ...s, zoom: false };
+const ZoomStep = (s, d) => s.phase !== "idle" ? s : { ...s, zk: clamp(focusK(s) + d, 0, s.crates.length - 1) };
+const NewCrate = (s) => s.phase !== "idle" ? s : withCrates(s, [...s.crates, blank()]);
+const ClearMem = (s) => s.phase !== "idle" ? s : withCrates({ ...s, text: "" }, [blank()]);
+
+// painting: pointerdown on a dot decides the value to paint (opposite of that dot);
+// pointermove over other dots (see the global handlers below) applies it.
+const setDot = (s, k, i, v) => {
+  if (s.phase !== "idle" || s.crates[k]?.[i] === v) return s;
+  const crates = s.crates.slice(); crates[k] = crates[k].slice(); crates[k][i] = v;
+  return { ...s, crates };
+};
+const PaintStart = (s, { k, i }) => s.phase !== "idle" ? s : setDot({ ...s, paint: 1 - s.crates[k][i] }, k, i, 1 - s.crates[k][i]);
+const PaintOver = (s, { k, i }) => s.paint == null ? s : setDot(s, k, i, s.paint);
+const PaintEnd = (s) => s.paint == null ? s : { ...s, paint: null };
+
+// strip scrolling: drag (touch/mouse) or wheel; releases snap to a whole crate
+const DragStart = (s, x) => ({ ...s, drag: { x, pos: s.pos } });
+const DragMove = (s, x) => !s.drag ? s : { ...s, pos: lim(s.drag.pos - (x - s.drag.x) / PITCH, s.crates.length) };
+const DragEnd = (s) => !s.drag ? s : { ...s, drag: null, pos: Math.round(s.pos) };
+const Wheel = (s, ev) => s.phase !== "idle" ? s : { ...s, pos: lim(Math.round(s.pos + Math.sign(ev.deltaX || ev.deltaY)), s.crates.length) };
+const Resized = (s) => ({ ...s, pos: lim(s.pos, s.crates.length) });
+
+// ---- modem sound: one steady tone per character (n bits: 16 in 4x4 mode, 8 in ASCII
+// mode) as it is sent, lasting the character's send time. The pitch depends only on the
+// character, so repeats sound identical and different characters differ.
+let actx = null, voice = null;
+const audio = () => {
+  try { actx ??= new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === "suspended") actx.resume(); } catch (_e) { /* no audio */ }
+  return actx;
+};
+const silence = () => { if (voice) { try { voice.stop(); } catch (_e) { /* already stopped */ } voice = null; } };
+const tone = (_dispatch, { freq, secs }) => {
+  const c = audio(); if (!c) return;
+  silence();
+  const o = c.createOscillator(), g = c.createGain(), t = c.currentTime;
+  o.type = "square";
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.05, t + 0.01);
+  g.gain.setValueAtTime(0.05, t + Math.max(0.011, secs - 0.02));
+  g.gain.linearRampToValueAtTime(0, t + secs);
+  o.connect(g); g.connect(c.destination);
+  o.onended = () => { if (voice === o) voice = null; };
+  o.start(t); o.stop(t + secs);
+  voice = o;
+};
+// pitch for a crate's bits (display order): 250 Hz * 2^(step / steps-per-octave).
+// 4x4: the glyph's place in the font (patterns outside it fold onto 12 more steps);
+// ASCII: the code (32 = lowest), a wider spread over the 95 printable codes.
+const toneFreq = (bits) => {
+  if (MODE === MODES.ascii) return 250 * 2 ** (Math.max(0, codeOf(bits) - 32) / 24);
+  const ch = MODE.decode(bits);
+  // space = lowest, then font order; patterns outside the font fold onto 12 more steps
+  const i = ch == null ? CHARS.length + 1 + (codeOf(bits) % 12) : ch === " " ? 0 : CHARS.indexOf(ch) + 1;
+  return 250 * 2 ** (i / 16);
+};
+const ToggleModem = (s) => {
+  if (s.modem) { silence(); return { ...s, modem: false, speed: s.prevSpeed ?? s.speed }; }
+  return [{ ...s, modem: true, prevSpeed: s.speed, speed: 40 }, [() => audio()]];
+};
+
+const SetSpeed = (s, ev) => ({ ...s, speed: +ev.target.value });
+const SetNoise = (s, ev) => ({ ...s, noise: +ev.target.value });
+const ToggleMarkers = (s) => ({ ...s, markers: !s.markers });
+const ToggleRaw = (s) => ({ ...s, raw: !s.raw });
+const ClearOut = (s) => ({ ...s, out: [], partial: [], next: 0, arrived: {}, seq: s.phase === "idle" ? 0 : s.seq });
+
+// PLAY: rewind to the opening position (crate 0), then start reading
+// While running the same button pauses/resumes: ticks stop (cursor stays put) and
+// the pipe's CSS animations are frozen (see .paused in app.mjs).
+const Play = (s) => {
+  if (s.phase !== "idle") {
+    if (s.paused) return { ...s, paused: false, nextAt: s.resumeIn == null ? null : performance.now() + s.resumeIn };
+    // pausing: remember how much of the current tick interval is left, so the
+    // first tick after resume keeps the stream's one-BIT spacing
+    const ms = 1000 / s.speed, left = s.lastTick ? Math.max(0, ms - (performance.now() - s.lastTick)) : null;
+    silence();
+    return { ...s, paused: true, resumeIn: left };
+  }
+  const data = isBlank(s.crates[s.crates.length - 1]) ? s.crates.slice(0, -1) : s.crates;
+  if (!data.length) return s;
+  return [{ ...s, phase: "rewind", paused: false, resumeIn: null, nextAt: null, lastTick: 0, data, cur: { k: 0, i: 0 }, pos: 0, bits: [], out: [], partial: [], arrived: {}, next: 0, seq: 0 },
+    [(d) => setTimeout(() => d(StartReading), 650)]];
+};
+const StartReading = (s) => s.phase === "rewind" ? { ...s, phase: "play" } : s;
+const Stop = (s) => (silence(), { ...s, phase: "idle", cur: null, data: null, paused: false, bits: [], arrived: {}, partial: [], next: 0, seq: 0, pos: maxPos(s.crates.length) });
+
+// one clock tick while playing: read the cursor's dot, put it in the pipe
+const Tick = (s) => {
+  if (s.phase !== "play") return s;
+  const { k, i } = s.cur, n = MODE.n;
+  const sent = s.data[k][MODE.order[i]];
+  const flip = Math.random() < s.noise;
+  const ideal = s.nextAt ?? performance.now();   // fixed schedule: ticks may fire late, squares must not
+  const bit = { id: s.seq, t0: ideal, v: flip ? 1 - sent : sent, dur: Math.round(((pipeWidth() + BIT) / (s.speed * (BIT + GAP))) * 1000) };
+  const last = k === s.data.length - 1 && i === n - 1;
+  const cur = i < n - 1 ? { k, i: i + 1 } : { k: k + 1, i: 0 };
+  const next = {
+    ...s, seq: s.seq + 1, bits: [...s.bits, bit], lastTick: ideal, nextAt: ideal + 1000 / s.speed, resumeIn: null,
+    cur: last ? null : cur,
+    phase: last ? "drain" : "play",
+    pos: !last && i === n - 1 ? lim(cur.k, s.crates.length) : s.pos,
+  };
+  return s.modem && i === 0 ? [next, [tone, { freq: toneFreq(s.data[k]), secs: n / s.speed }]] : next;
+};
+
+// a square reached the pipe's left end: deliver in order, decode every MODE.n bits
+const Arrive = (s, id) => {
+  const arrived = { ...s.arrived, [id]: s.bits.find((b) => b.id === id)?.v ?? 0 };
+  let { next, out, partial } = s, bits = s.bits.filter((b) => b.id !== id);
+  out = out.slice(); partial = partial.slice();
+  while (arrived[next] != null) {
+    partial.push(arrived[next]); delete arrived[next]; next++;
+    if (partial.length === MODE.n) {
+      const shown = Array(MODE.n);                       // back to display order
+      partial.forEach((v, j) => { shown[MODE.order[j]] = v; });
+      out.push({ ch: MODE.decode(shown), bits: partial.join("") }); partial = [];
+    }
+  }
+  const done = s.phase === "drain" && bits.length === 0;
+  return { ...s, paused: done ? false : s.paused, arrived, next, out, partial, bits, phase: done ? "idle" : s.phase, pos: done ? maxPos(s.crates.length) : s.pos };
+};
+
+// Each square is a CSS animation, but a new animation only starts at the browser's next
+// frame, which lags the tick that emitted it by a variable amount -- visible as uneven
+// gaps at high speed. So when a square's element is added (see the observer in `global`)
+// its animation's startTime is pinned to the scheduled emit time (data-t0), making its
+// position exact whenever it is drawn.
+const pipeWidth = () => document.getElementById("pipe")?.clientWidth || innerWidth / 2;
+
+// ---- subscriptions / global pointer handlers -------------------------------
+// `first` = ms until the first tick (after a resume); later ticks every `ms`
+const clock = (dispatch, { ms, first }) => {
+  let iv, to;
+  const start = () => { iv = setInterval(() => dispatch(Tick), ms); };
+  if (first != null) to = setTimeout(() => { dispatch(Tick); start(); }, first); else start();
+  return () => { clearTimeout(to); clearInterval(iv); };
+};
+const global = (dispatch) => {
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType === 1 && n.dataset && n.dataset.t0) { const a = n.getAnimations()[0]; if (a) a.startTime = +n.dataset.t0; }
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+  const dotAt = (ev) => {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.("[data-dot]");
+    return el ? { k: +el.dataset.k, i: +el.dataset.i } : null;
+  };
+  addEventListener("pointermove", (ev) => {
+    dispatch((s) => {
+      if (s.paint != null) { const d = dotAt(ev); return d ? PaintOver(s, d) : s; }
+      return s.drag ? DragMove(s, ev.clientX) : s;
+    });
+  });
+  const up = () => dispatch((s) => s.paint != null ? PaintEnd(s) : DragEnd(s));
+  addEventListener("pointerup", up); addEventListener("pointercancel", up);
+  addEventListener("resize", () => dispatch(Resized));
+  addEventListener("keydown", (ev) => { if (ev.key === "Escape") dispatch((st) => st.zoom ? { ...st, zoom: false } : st); });   // Esc leaves the magnified view
+};
+
+// ---- view ------------------------------------------------------------------
+const VALUES = [128, 64, 32, 16, 8, 4, 2, 1];
+const MagnifierIcon = () => h("svg", { viewBox: "0 0 24 24", width: 26, height: 26, fill: "none", stroke: "currentColor", "stroke-width": 2.6, "stroke-linecap": "round" }, [
+  h("circle", { cx: 10, cy: 10, r: 6.5 }), h("path", { d: "M15 15 L21 21" }),
+]);
+const Crate = (s, bits, k) => {
+  const ascii = s.mode === "ascii";
+  const active = k === s.crates.length - 1 && s.phase === "idle";
+  const ch = MODE.decode(bits);
+  const reading = s.cur && s.phase === "play" && s.cur.k === k;
+  const cap = ascii ? (ch == null ? "?" : ch) + " · " + codeOf(bits) : ch == null ? "?" : ch === " " ? "␣" : ch;
+  return h("div", { class: { crate: true, active, reading, spent: s.cur && k < s.cur.k, big: ascii && s.zoom } }, [
+    ...(s.phase !== "idle" ? [] : [h("button", { class: "del", title: "delete", "aria-label": "delete character", onclick: [DeleteCrate, k] }, [text("×")]),
+      h("div", { class: "insz" }, [h("button", { class: "ins", title: "insert character here", "aria-label": "insert character", onclick: [InsertCrate, k] }, [text("+")])])]),
+    ...(ascii ? [h("div", { class: "vals" }, VALUES.map((v) => h("span", {}, [text(String(v))])))] : []),
+    h("div", { class: { wells: true, w8: ascii } }, bits.map((v, i) =>
+      h("div", {
+        class: { dot: true, on: !!v, cursor: reading && MODE.order[s.cur.i] === i },
+        "data-dot": 1, "data-k": k, "data-i": i,
+        onpointerdown: (st, ev) => { ev.preventDefault(); return [PaintStart, { k, i }]; },
+      }))),
+    h("div", { class: { cap: true, faint: ch == null || ch === " " } }, [text(cap)]),
+  ]);
+};
+
+// Character-set overlays shown from the tabs: each character as its pattern with the
+// character beneath (4x4) or beneath plus its ASCII number (8 bit; the same set as the
+// font). Static, so built once.
+const OV = {};
+const overlay = (m) => OV[m] ??= CHARS.map((c) => {
+  const bits = m === "font" ? bitsOf(c) : asciiBits(c);
+  return h("div", { class: "card" }, [
+    h("div", { class: { mini: true, m8: m === "ascii" } }, bits.map((v) => h("i", { class: { on: !!v } }))),
+    h("b", {}, [text(c === " " ? "␣" : c)]),
+    ...(m === "ascii" ? [h("small", {}, [text(String(c.charCodeAt(0)))])] : []),
+  ]);
+});
+
+const view = (s) => {
+  const busy = s.phase !== "idle";
+  const zoomed = s.zoom && s.mode === "ascii";
+  return h("main", { class: { busy } }, [
+    h("section", { class: "mem" }, [
+      h("div", { class: "ribbon sender" }, [text("SENDER")]),
+      h("div", {
+        class: { strip: true, dragging: !!s.drag },
+        onpointerdown: (st, ev) => ev.target.closest("[data-dot], button") ? st : DragStart(st, ev.clientX),
+        onwheel: Wheel,
+      }, [
+        h("div", { class: "track", style: { transform: `translateX(${-s.pos * PITCH}px)`, "--pitch": PITCH + "px" } },
+          s.crates.map((bits, k) => Crate(s, bits, k))),
+      ]),
+      h("div", { class: "tabs" }, Object.keys(MODES).map((m) =>
+        h("div", { class: "tabwrap" }, [
+          h("button", { class: { tab: true, on: s.mode === m }, onclick: [TabClick, m] }, [text(MODES[m].label)]),
+          h("div", { class: { ov: true, show: s.help === m }, onclick: CloseHelp }, overlay(m)),
+        ]))),
+      h("textarea", { placeholder: "type here…  or paint the bits", value: s.text, oninput: EditText, rows: 2, disabled: busy, autocapitalize: s.mode === "font" ? "characters" : "off", spellcheck: false }),
+      h("div", { class: "btns" }, [
+        ...(s.mode === "ascii" ? [h("button", { class: { zoombtn: true, on: s.zoom }, disabled: busy, onclick: ToggleZoom, title: "magnify one character", "aria-label": "magnify", "aria-pressed": !!s.zoom }, [MagnifierIcon()])] : []),
+        h("button", { onclick: NewCrate, disabled: busy }, [text("+ character")]),
+        h("button", { onclick: ClearMem, disabled: busy }, [text("clear input")]),
+      ]),
+    ]),
+    h("section", { class: "net" }, [
+      h("div", { class: "ribbon receiver" }, [text("RECEIVER")]),
+      h("div", { class: "ribbon network" }, [text("NETWORK")]),
+      h("div", { class: "out" }, [
+        h("div", { class: "scroll" }, [
+        h("label", { class: "rawbits" }, [
+          h("input", { type: "checkbox", checked: s.raw, onchange: ToggleRaw }),
+          text(" raw bits"),
+        ]),
+        h("div", { class: "title" }, [text("decoder: " + MODE.label)]),
+        h("div", { class: "decoded" }, [
+          ...s.out.map((o) => s.raw
+            ? h("span", { class: "raw" }, [text(o.bits + " ")])
+            : h("span", { class: { ch: true, faint: o.ch == null }, title: o.bits }, [text(o.ch == null ? "?" : o.ch === " " ? " " : o.ch)])),
+          ...(s.partial.length ? [h("span", { class: "partial" }, [text(s.partial.join(""))])] : []),
+        ]),
+        ]),
+        h("button", { class: "clearout", onclick: ClearOut }, [text("clear output")]),
+      ]),
+      h("div", { class: "pipewrap" }, [
+        h("div", { class: "netctl" }, [
+          h("label", {}, [
+            h("input", { type: "checkbox", checked: s.markers, onchange: ToggleMarkers }),
+            text(" marker every " + MODE.n + " bits"),
+          ]),
+          h("label", {}, [
+            h("input", { type: "checkbox", checked: s.modem, onchange: ToggleModem }),
+            text(" modem sound"),
+          ]),
+          h("label", {}, [text("speed "), h("input", { type: "range", min: 1, max: 40, step: 1, value: s.speed, oninput: SetSpeed }), text(" " + s.speed + " bit/s")]),
+          h("label", {}, [text("noise "), h("input", { type: "range", min: 0, max: 0.3, step: 0.01, value: s.noise, oninput: SetNoise }), text(" " + Math.round(s.noise * 100) + "%")]),
+        ]),
+        h("div", { id: "pipe", class: { pipe: true, paused: s.paused } }, s.bits.map((b) =>
+          h("div", {
+            key: b.id, class: { bit: true, one: !!b.v, mark: s.markers && b.id % MODE.n === 0 },
+            "data-t0": b.t0, style: { animationDuration: b.dur + "ms" },
+            onanimationend: (st) => Arrive(st, b.id),
+          }))),
+      ]),
+    ]),
+    h("button", { class: { play: true, pause: busy && !s.paused }, onclick: Play, "aria-label": busy && !s.paused ? "pause" : "play" }, [text(busy && !s.paused ? "❚❚" : "▶")]),
+    ...(busy ? [h("button", { class: "stopbtn", onclick: Stop, "aria-label": "stop" }, [text("■ stop")])] : []),
+    // focus view: one large byte over everything else; a click/tap outside it closes
+    ...(zoomed ? [h("div", { class: "zoomview", onclick: ZoomAway }, [
+      h("button", { class: "zstep", disabled: focusK(s) === 0, onclick: [ZoomStep, -1], "aria-label": "previous character" }, [text("◀")]),
+      Crate(s, s.crates[focusK(s)], focusK(s)),
+      h("button", { class: "zstep", disabled: focusK(s) >= s.crates.length - 1, onclick: [ZoomStep, 1], "aria-label": "next character" }, [text("▶")]),
+      h("div", { class: "zhint" }, [text("click or tap outside the byte, or press Esc, to close")]),
+    ])] : []),
+  ]);
+};
+
+app({
+  node: document.getElementById("app"),
+  init: [
+    { crates: [blank()], pos: maxPos(1), mode: "font", help: null, zoom: false, zk: null, text: "", phase: "idle", paused: false, resumeIn: null, lastTick: 0, paint: null, drag: null, cur: null, data: null,
+      bits: [], arrived: {}, next: 0, seq: 0, out: [], partial: [], speed: 8, modem: false, noise: 0, raw: false, markers: false },
+    [global],
+  ],
+  view,
+  subscriptions: (s) => [s.phase === "play" && !s.paused && [clock, { ms: Math.round(1000 / s.speed), first: s.resumeIn }]],
+});
+
+})();
+</script>
