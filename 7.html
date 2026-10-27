@@ -41,6 +41,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-
 .node{transition:opacity .5s,filter .5s}
 .node.dim{opacity:.45;filter:grayscale(.85)}
 .node.arrive{animation:arrive .5s ease-out}
+.feint{position:absolute;z-index:0;overflow:hidden;font:10.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;pointer-events:none;
+-webkit-mask-image:linear-gradient(to right,#000 78%,transparent);mask-image:linear-gradient(to right,#000 78%,transparent)}
+.feint-name{opacity:.55;margin-bottom:4px;font-family:system-ui,sans-serif;font-size:11px}
+.fl{white-space:pre;opacity:.34;padding:0 4px;border-radius:3px;transition:opacity .3s,background .3s}
+.fl.on{opacity:1;background:var(--hit)}
 @keyframes arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .node.lit{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 25%,transparent)}
 .nh{font-weight:600;font-size:15px}
@@ -614,13 +619,13 @@ const EV = [
     cap: "style.css arrives. This file contains declaration for how the page should look: colours, fonts, sizes." },
   { id: "pH1", t0: 13.6, t1: 15, step: "The <h1> heading is drawn",
     cap: "<h1> is a big heading. The browser draws it, plain for now because the style sheet has not arrived." },
-  { id: "pImg", t0: 15, t1: 16.4, step: "The browser finds an <image> tag as processing continues",
+  { id: "pImg", t0: 15, t1: 16.4, step: "The browser finds an <img> tag as processing continues",
     cap: "<img> is a picture. The browser leaves a space for it and asks for the image file, " + PIC + "." },
   { id: "imgReq", t0: 15.4, t1: 16.4, from: "browser", to: "server", lane: 2, kind: "img" },
   { id: "imgLook", t0: 16.4, t1: 17.2, cap: "The web server gets the image file ready to send." },
   { id: "imgRep", t0: 17.2, t1: 18.4, from: "server", to: "browser", lane: 2, kind: "img", step: "The image arrives",
     cap: "The image arrives and fills its space." },
-  { id: "pSvg", t0: 16.4, t1: 17.8, step: "It finds a <image> tag",
+  { id: "pSvg", t0: 16.4, t1: 17.8, step: "It finds an <img> tag",
     cap: "There is a second <img>. This one is a drawing, " + SVG + ". The browser asks for it too." },
   { id: "svgReq", t0: 16.8, t1: 17.8, from: "browser", to: "server", lane: 0, kind: "svg" },
   { id: "svgLook", t0: 17.8, t1: 18.6, cap: "The web server gets the drawing ready to send." },
@@ -748,7 +753,7 @@ function colourLine(line) {
 // notes are drawn on top of it (the `rail`, centred half-way down). Lines and boxes leave from `anchor`: the right edge
 // of the browser pane, half-way down it (wide); the bottom of the pane (narrow).
 const GEO = {
-  wide: { win: [0, 0, 46, 100], rail: [25, 0, 20, 100], dns: [66, 2, 32, 36], server: [66, 42, 32, 44], viewer: [49, 2, 49, 96], anchor: [46, 50], lane: "y" },
+  wide: { win: [0, 0, 46, 100], rail: [25, 0, 20, 100], dns: [70, 2, 28, 36], server: [70, 42, 28, 44], feint: [47, 3, 22.5, 94], viewer: [49, 2, 49, 96], anchor: [46, 50], lane: "y" },
   narrow: { win: [0, 0, 100, 58], rail: [8, 0, 84, 58], dns: [4, 61, 92, 18], server: [4, 80, 92, 19], viewer: [3, 60, 94, 39], anchor: [50, 58], lane: "x" },
 }
 const px = ([l, t, w, h]) => ({ left: l + "%", top: t + "%", width: w + "%", ...(h != null ? { height: h + "%" } : {}) })
@@ -793,6 +798,18 @@ function serverFiles(t) {
 
 const noteEl = (doc) => (o) => el("div", { key: o.at + o.t0, class: "note c-" + o.kind }, typeof o.text === "function" ? o.text(doc) : o.text)
 
+// The page the browser has just received, shown faintly in the blank area behind the diagram while it is being read; the
+// line being talked about lights up. Once the page is complete the same file is on the right (the viewer), so this goes.
+const READ_LINE = { pTitle: 3, pLink: 4, pH1: 7, pImg: 8, pSvg: 9 } // timeline event -> line of index.html it is about
+function feintSource(s, t, g) {
+  const now = Object.keys(READ_LINE).find((id) => active(t, BY[id]))
+  const at = now == null ? -1 : READ_LINE[now]
+  return el("div", { key: "feint", class: "feint", style: px(g.feint) }, [
+    el("div", { key: "name", class: "feint-name" }, "index.html (received)"),
+    ...htmlLines(s.doc).map((ln, i) => el("div", { key: i, class: i === at ? "fl on" : "fl" }, [...colourLine(ln), text(" ")])),
+  ])
+}
+
 function stage(s) {
   const t = s.mode === "running" ? s.time : -1
   const g = s.narrow ? GEO.narrow : GEO.wide
@@ -806,7 +823,9 @@ function stage(s) {
     ])
   const complete = done(t, "svgRep")
   const knowsIP = done(t, "dnsRep")
+  const showFeint = !complete && g.feint && done(t, "htmlRep") // wide screens only; narrow ones have no blank area
   return el("div", { key: "stage", class: "stage" }, [
+    showFeint && feintSource(s, t, g),
     // a wire only exists while something is travelling along it
     el("svg", { key: "wires", class: "wires", viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" },
       moving.map((e) => { const r = route(g, e, 0); return el("line", { x1: r.x0, y1: r.y0, x2: r.x1, y2: r.y1, class: "wire c-" + e.kind }) })),
