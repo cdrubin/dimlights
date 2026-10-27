@@ -34,9 +34,15 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,sans-
 .stage{position:relative;height:474px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;padding:0}
 .rail{position:absolute;z-index:3;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 8px;pointer-events:none}
 @media(max-width:860px){.stage{height:800px}}
-.wires{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-.wire{stroke:var(--c);stroke-width:2;stroke-dasharray:5 5;opacity:.7;vector-effect:non-scaling-stroke}
-.pkt{position:absolute;z-index:1;width:30px;height:22px;margin:-11px 0 0 -15px;border-radius:6px;background:var(--c);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.pipe{position:absolute;z-index:1;height:19px;transform-origin:0 50%;overflow:hidden;background:#8e9bb0;border:3px solid var(--c);border-radius:3px;box-shadow:inset 0 2px 4px rgba(0,0,0,.3),0 1px 5px rgba(0,0,0,.4)}
+.train{position:absolute;right:100%;top:0;height:100%;display:flex;align-items:center}
+.bitsum{flex:none;width:142px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-right:3px;white-space:nowrap;font:600 10.5px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#14181d}
+.dots{display:flex;gap:3px}
+.dots i{display:block;width:5px;height:5px;border-radius:50%;background:#14181d}
+/* a pipe that points left is already upside down; turning the label back leaves its contents in reading order, so pack them against the squares on the left */
+.bitsum.flip{transform:rotate(180deg);flex-direction:row-reverse;justify-content:flex-end;padding:0 0 0 3px}
+.sq{flex:none;box-sizing:border-box;width:9px;height:9px;margin-right:2px;background:#fff;border:1px solid #14181d}
+.sq.on{background:#14181d}
 .node{position:absolute;z-index:2;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:8px 10px;overflow:hidden;display:flex;flex-direction:column;gap:6px}
 .node{transition:opacity .5s,filter .5s}
 .node.dim{opacity:.45;filter:grayscale(.85)}
@@ -758,7 +764,7 @@ const GEO = {
 }
 const px = ([l, t, w, h]) => ({ left: l + "%", top: t + "%", width: w + "%", ...(h != null ? { height: h + "%" } : {}) })
 const centre = (g, n) => (n === "browser" ? g.anchor : [g[n][0] + g[n][2] / 2, g[n][1] + g[n][3] / 2])
-const LANE = [0, -3.2, 3.2] // the three roads between browser and server
+const LANE = [0, -5.5, 5.5] // the three roads between browser and server
 
 function route(g, e, f) {
   const [x0, y0] = centre(g, e.from), [x1, y1] = centre(g, e.to)
@@ -810,6 +816,43 @@ function feintSource(s, t, g) {
   ])
 }
 
+// A transfer is drawn like the pipe in network1: a pipe with a border in the transfer's colour that runs the whole way from
+// the sender to the receiver, and a stream of black (1) and white (0) squares that travels along it at a steady pace, in at
+// the sender's end and out at the receiver's. Each square keeps its colour. The stream is always longer than the stretch of
+// pipe you can see (so for a moment the whole pipe is full of bits); replies are longer the bigger the file is. Behind the
+// last square come three dots and then a count of the bits sent so far, which ends at the size of the transfer.
+const SQ = 11 // px from one square to the next
+const LABEL_W = 142 // px reserved behind the squares for the three dots and the bit count
+const FACTOR = { dnsReq: 1, dnsRep: 1, htmlReq: 1, htmlRep: 1.4, cssReq: 1, cssRep: 1.25, imgReq: 1, imgRep: 2.4, svgReq: 1, svgRep: 1.4 }
+const REQUEST_BYTES = { dnsReq: 40, dnsRep: 58, htmlReq: 90, cssReq: 90, imgReq: 100, svgReq: 100 } // roughly what a request or answer weighs
+const REPLY_ROW = { htmlRep: "html", cssRep: "css", imgRep: "pic", svgRep: "svg" } // a reply is as big as the file it carries
+const bitsOf = (e, doc) => 8 * (REPLY_ROW[e.id] ? ROWS.find((r) => r.id === REPLY_ROW[e.id]).bytes(doc) : REQUEST_BYTES[e.id])
+const bitAt = (id, i) => { let x = 2166136261; for (const c of id + ":" + i) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619) } return (x >>> 9) & 1 }
+function stream(e, s, t, g) {
+  const f = Math.min(1, Math.max(0, (t - e.t0) / (e.t1 - e.t0)))
+  const r = route(g, e, 0) // from the sender to the receiver
+  const st = document.querySelector(".stage")
+  const w = (st && st.clientWidth) || 1148, h = (st && st.clientHeight) || 474
+  const dx = ((r.x1 - r.x0) * w) / 100, dy = ((r.y1 - r.y0) * h) / 100 // the route, in pixels as drawn on the screen
+  const len = Math.hypot(dx, dy), angle = (Math.atan2(dy, dx) * 180) / Math.PI
+  // the stretch you can see runs from the browser pane to the edge of the other pane; the rest is hidden behind that pane
+  const node = e.from === "browser" ? e.to : e.from
+  const [ax, ay] = g.anchor, [cx, cy] = centre(g, node)
+  const u = g.lane === "y" ? (g[node][0] - ax) / (cx - ax) : (g[node][1] - ay) / (cy - ay)
+  const visible = Math.min(len, Math.max(0, u) * len)
+  const n = Math.ceil((Math.ceil(visible / SQ) + 2) * FACTOR[e.id]) // always at least the visible stretch (+2): the pipe fills completely
+  const head = f * (len + n * SQ + LABEL_W) // how far the front of the stream has got along the pipe
+  const upsideDown = Math.abs(angle) > 90 // pipes pointing left would show their text upside down, so turn it round
+  // bits sent = bits that have left the sender: it counts up while the stream pulls out, then holds the total
+  const sent = Math.round(bitsOf(e, s.doc) * Math.min(1, head / (n * SQ + LABEL_W))).toLocaleString("en-US")
+  return el("div", { key: "pkt-" + e.id, class: "pipe c-" + e.kind, style: { left: r.x0 + "%", top: `calc(${r.y0}% - 9.5px)`, width: len.toFixed(1) + "px", transform: `rotate(${angle.toFixed(2)}deg)` } },
+    el("div", { class: "train", style: { transform: `translateX(${head.toFixed(1)}px)` } }, [
+      // behind the last square: three dots (as big as the squares, so they can be seen) and then the count
+      el("span", { class: upsideDown ? "bitsum flip" : "bitsum" }, [el("span", {}, `${sent} bits`), el("span", { class: "dots" }, [el("i", {}, ""), el("i", {}, ""), el("i", {}, "")])]),
+      ...Array.from({ length: n }, (_, i) => n - 1 - i).map((k) => el("i", { key: k, class: bitAt(e.id, k) ? "sq on" : "sq" }, "")),
+    ]))
+}
+
 function stage(s) {
   const t = s.mode === "running" ? s.time : -1
   const g = s.narrow ? GEO.narrow : GEO.wide
@@ -826,13 +869,8 @@ function stage(s) {
   const showFeint = !complete && g.feint && done(t, "htmlRep") // wide screens only; narrow ones have no blank area
   return el("div", { key: "stage", class: "stage" }, [
     showFeint && feintSource(s, t, g),
-    // a wire only exists while something is travelling along it
-    el("svg", { key: "wires", class: "wires", viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" },
-      moving.map((e) => { const r = route(g, e, 0); return el("line", { x1: r.x0, y1: r.y0, x2: r.x1, y2: r.y1, class: "wire c-" + e.kind }) })),
-    ...moving.map((e) => {
-      const r = route(g, e, Math.min(1, Math.max(0, (t - e.t0) / (e.t1 - e.t0))))
-      return el("div", { key: "pkt-" + e.id, class: "pkt c-" + e.kind, style: { left: r.x + "%", top: r.y + "%" } }, "")
-    }),
+    // a stream of squares exists only while a transfer is under way
+    ...moving.map((e) => stream(e, s, t, g)),
     browserWindow(s, px(g.win)),
     el("div", { key: "rail", class: "rail", style: px(g.rail) }, on("browser").map(noteEl(s.doc))),
     // once the page is complete the servers have nothing more to do: the right-hand side shows the files instead
